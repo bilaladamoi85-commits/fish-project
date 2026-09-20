@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Emotional AI Voice Generator</title>
+<link rel="stylesheet" href="styles.css">
+
+<style>
+/* Voice search cleanup */
+#voiceResultCount {
+  display: none !important;
+}
+
+#loadMoreVoices,
+#refreshVoices,
+.voice-load-more,
+.voice-refresh,
+.voice-results-actions,
+.voice-pagination,
+.voice-loading-status,
+.voice-result-status,
+.voice-load-status,
+button[data-action="load-more"],
+button[data-action="refresh"],
+button.load-more,
+button.refresh-voices {
+  display: none !important;
+}
+
+/* Search voice cards */
+#voiceSearchResultsBox {
+  width: 100%;
+}
+
+.voice-card {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  margin: 8px 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.voice-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.voice-card-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.08);
+  font-size: 21px;
+}
+
+.voice-card-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.voice-card-name {
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.voice-card-tag {
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  opacity: .85;
+}
+
+.voice-card-save {
+  width: 48px;
+  min-width: 48px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.voice-card.selected {
+  outline: 1px solid rgba(255,255,255,.18);
+}
+
+.voice-card-check {
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.voice-no-results {
+  padding: 14px;
+  opacity: .7;
+}
+</style>
+
+
+
+
+
+
+
+
+<style id="final-voice-ui">
+#voiceResultCount {
+  display: none !important;
+}
+
+#loadMoreBtn,
+#refreshBtn {
+  display: none !important;
+}
+
+.voice-card-save {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  min-width: 52px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 22px;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.voice-card {
+  display: flex !important;
+  align-items: center;
+  width: 100%;
+}
+
+.voice-card-main {
+  flex: 1;
+}
+</style>
+
+<style id="cinematic-mode-style">
+#cinematicModeBtn.cinematic-mode-btn {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 9999 !important;
+  width: 100%;
+  min-height: 52px;
+  margin: 12px 0;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 15px;
+  background: rgba(255,255,255,.06);
+  color: inherit;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  transition: .2s ease;
+}
+
+#cinematicModeBtn .cinematic-icon {
+  font-size: 24px;
+}
+
+#cinematicModeBtn .cinematic-state {
+  margin-left: auto;
+  opacity: .65;
+  font-size: 12px;
+}
+
+#cinematicModeBtn.active {
+  background: linear-gradient(135deg, rgba(255,193,7,.20), rgba(255,255,255,.07));
+  border-color: rgba(255,193,7,.65);
+  box-shadow: 0 0 0 1px rgba(255,193,7,.10);
+}
+</style>
+
+</head>
+<body>
+<div class="container">
+
+<header class="hero">
+  <div class="hero-mark" aria-hidden="true">
+    <svg viewBox="0 0 64 64" width="42" height="42" fill="none">
+      <path d="M22 30a10 10 0 0 1 20 0v6a10 10 0 0 1-20 0v-6Z"
+            stroke="currentColor" stroke-width="2.4"/>
+      <path d="M17 34v2a15 15 0 0 0 30 0v-2"
+            stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M32 51v7M25 58h14"
+            stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <h1>حوّل النص إلى صوت احترافي</h1>
+  <p>صوت واضح، سريع، وسهل الاستعمال من الهاتف.</p>
+
+  <div class="hero-wave" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <div class="hero-points">
+    <span>
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"
+              stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      سريع
+    </span>
+
+    <span>
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9"
+                stroke="currentColor" stroke-width="1.8"/>
+        <path d="M8 12.5l2.5 2.5L16.5 9"
+              stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      جودة عالية
+    </span>
+
+    <span>
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 3v18M3 12h18"
+              stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="8"
+                stroke="currentColor" stroke-width="1.8"/>
+      </svg>
+      سهل
+    </span>
+  </div>
+</header>
+
+<section class="card">
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">VOICE LIBRARY</span>
+      <h2>اختار صوتك</h2>
+    </div>
+    <span class="section-dot"></span>
+  </div>
+
+<div class="voice-modern">
+<select id="languageSelect" style="display:none"><option value="">All</option></select>
+
+  <div class="voice-search-wrap">
+    <span class="voice-search-icon">🔎</span>
+    
+
+<input
+      id="voiceSearch"
+      class="input voice-modern-search"
+      type="search"
+      placeholder="Search voice by name..."
+      autocomplete="off"
+    >
+
+<section id="recentVoicesSection" class="recent-voices-section" aria-label="آخر الأصوات المحفوظة">
+  <div id="recentVoicesBox"></div>
+</section>
+  </div>
+<div class="voice-results-head">
+    <div>
+      <span class="voice-results-title">نتائج البحث</span>
+      <span id="voiceResultCount" class="voice-result-count"></span>
+    </div>
+  </div>
+
+  <div id="voiceSearchResultsBox" class="voice-cards"></div>
+<select id="voiceSelect" style="display:none!important"></select>
+
+  <div id="voiceInfo" class="voice-info"></div>
+
+</div>
+
+<style>
+.voice-modern {
+  width:100%;
+}
+
+.voice-search-wrap {
+  position:relative;
+  margin:12px 0;
+}
+
+.voice-modern-search {
+  width:100%;
+  box-sizing:border-box;
+  padding:15px 48px 15px 18px !important;
+  border-radius:16px !important;
+  font-size:16px !important;
+}
+
+.voice-search-icon {
+  position:absolute;
+  right:17px;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:21px;
+  opacity:.75;
+  pointer-events:none;
+}
+
+.voice-filters {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+  margin:10px 0 16px;
+}
+
+.voice-filter {
+  width:100%;
+  min-width:0;
+  padding:12px 10px;
+  border-radius:13px;
+  border:1px solid rgba(255,255,255,.13);
+  background:rgba(255,255,255,.055);
+  color:inherit;
+  font-size:13px;
+  outline:none;
+}
+
+.voice-filter:focus {
+  border-color:rgba(100,160,255,.65);
+}
+
+.voice-results-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin:4px 2px 10px;
+}
+
+.voice-results-title {
+  font-size:16px;
+  font-weight:800;
+}
+
+.voice-result-count {
+  margin-left:7px;
+  font-size:12px;
+  opacity:.55;
+}
+
+.voice-cards {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+  gap:11px;
+}
+
+.voice-card {
+  position:relative;
+  padding:14px;
+  min-height:126px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.10);
+  background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025));
+  box-shadow:0 7px 22px rgba(0,0,0,.12);
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+  cursor:pointer;
+  box-sizing:border-box;
+}
+
+.voice-card:hover {
+  transform:translateY(-2px);
+  border-color:rgba(120,170,255,.42);
+  box-shadow:0 10px 28px rgba(0,0,0,.19);
+}
+
+.voice-card.selected {
+  border-color:rgba(90,150,255,.85);
+  box-shadow:0 0 0 2px rgba(90,150,255,.15),0 10px 28px rgba(0,0,0,.18);
+}
+
+.voice-card-top {
+  display:flex;
+  align-items:flex-start;
+  gap:11px;
+}
+
+.voice-avatar {
+  width:46px;
+  height:46px;
+  min-width:46px;
+  border-radius:15px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+  background:linear-gradient(145deg,rgba(100,150,255,.24),rgba(255,255,255,.07));
+  border:1px solid rgba(255,255,255,.12);
+}
+
+.voice-card-name {
+  font-weight:750;
+  font-size:14px;
+  line-height:19px;
+  padding-right:28px;
+  word-break:break-word;
+}
+
+.voice-card-meta {
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-top:7px;
+}
+
+.voice-tag {
+  padding:4px 7px;
+  border-radius:8px;
+  font-size:10px;
+  background:rgba(255,255,255,.065);
+  opacity:.78;
+}
+
+.voice-save {
+  position:absolute;
+  right:10px;
+  top:10px;
+  width:34px;
+  height:34px;
+  border:0;
+  border-radius:10px;
+  background:rgba(255,255,255,.075);
+  color:inherit;
+  font-size:17px;
+  cursor:pointer;
+}
+
+.voice-save.saved {
+  background:rgba(65,160,95,.20);
+}
+
+.voice-selected {
+  position:absolute;
+  right:11px;
+  bottom:10px;
+  font-size:12px;
+  opacity:.9;
+}
+
+
+
+.voice-select {
+  display:none !important;
+}
+
+.voice-info {
+  margin-top:12px;
+}
+
+#recentVoicesBox {
+  margin-bottom:16px;
+}
+
+.recent-voice-inner {
+  padding:13px;
+  border-radius:17px;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.09);
+}
+
+.recent-voice-title {
+  font-size:13px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+
+.recent-voice-list {
+  display:flex;
+  gap:9px;
+  overflow-x:auto;
+  padding:2px 2px 6px;
+}
+
+.recent-voice-item {
+  position:relative;
+  flex:0 0 68px;
+  text-align:center;
+}
+
+.recent-voice-button {
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.18);
+  background:linear-gradient(145deg,rgba(100,150,255,.22),rgba(255,255,255,.06));
+  color:inherit;
+  font-size:23px;
+  cursor:pointer;
+}
+
+.recent-voice-name {
+  margin-top:6px;
+  font-size:10px;
+  line-height:13px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.recent-voice-delete {
+  position:absolute;
+  top:-3px;
+  right:2px;
+  width:20px;
+  height:20px;
+  border:0;
+  border-radius:50%;
+  background:#e04444;
+  color:#fff;
+  font-size:14px;
+  line-height:18px;
+  cursor:pointer;
+}
+
+@media(max-width:600px) {
+  .voice-cards {
+    grid-template-columns:1fr;
+  }
+
+  .voice-filters {
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media(max-width:380px) {
+  .voice-filters {
+    grid-template-columns:1fr;
+  }
+}
+</style>
+
+  <div class="voice-actions">
+  </div>
+
+  <div id="voiceStatus" class="small"></div>
+</section>
+
+
+
+<section class="card">
+  <h2>📝 Text to Speech</h2>
+
+  <textarea id="textInput" class="textarea"
+    placeholder="Write your text here..."
+    maxlength="50000">السلام عليكم</textarea>
+
+  <div class="counter-row">
+    <span id="charCount">0 / 50000 characters</span>
+    <span id="chunkInfo">⚡ Up to 50,000 characters</span>
+  </div>
+
+  <h3>أسلوب الصوت</h3>
+
+  <button id="cinematicModeBtn" type="button" class="cinematic-mode-btn" aria-pressed="false">
+  <span class="cinematic-icon">🎬</span>
+  <span class="cinematic-label">السرد السينمائي</span>
+  <span class="cinematic-state">متوقف</span>
+</button>
+
+  <div class="emotions">
+    <button class="emotion active" data-emotion="neutral">Neutral</button>
+    <button class="emotion" data-emotion="excited">Excited</button>
+    <button class="emotion" data-emotion="sad">Sad</button>
+    <button class="emotion" data-emotion="angry">Angry</button>
+    <button class="emotion" data-emotion="calm">Calm</button>
+    <button class="emotion" data-emotion="whispering">Whispering</button>
+    <button class="emotion" data-emotion="laughing">Laughing</button>
+    <button class="emotion" data-emotion="emphasis">Emphasis</button>
+  </div>
+
+  <button id="generateBtn" class="btn primary" onclick="generateSpeech()">
+    إنشاء الصوت
+  </button>
+
+  <div id="progressBox" class="progress-box hidden">
+    <div class="progress-title" id="progressText">Preparing...</div>
+
+    <div class="time-row">
+      <div class="time-card elapsed-card">
+        <span class="time-label">⏱️ الوقت المنقضي</span>
+        <strong id="elapsedTime">0s</strong>
+      </div>
+
+      <div class="time-card remaining-card">
+        <span class="time-label">⏳ باقي تقريباً</span>
+        <strong id="remainingTime">120s</strong>
+      </div>
+    </div>
+
+    <div class="progress-bar">
+      <div id="progressFill"></div>
+    </div>
+  </div>
+
+  <div id="statusBox" class="status-box"></div>
+</section>
+
+<section class="ad-slot" aria-label="مساحة إعلانية">
+  <div class="ad-slot-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M4 7.5h16v9H4z"
+            stroke="currentColor" stroke-width="1.7"
+            stroke-linejoin="round"/>
+      <path d="M8 19h8M12 16.5V19"
+            stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div>
+    <strong>مساحة إعلانية</strong>
+    <span>يمكنك إضافة إعلانك هنا لاحقاً</span>
+  </div>
+</section>
+
+<section id="audioSection" class="card hidden">
+  <h2>الصوت الناتج</h2>
+  <audio id="audioPlayer" controls preload="metadata"></audio>
+
+  <div class="audio-actions">
+    <button class="btn primary" onclick="downloadAudio()">تحميل MP3</button>
+    <button class="btn secondary" onclick="copyAudioUrl()">نسخ رابط الصوت</button>
+  </div>
+
+  <div id="audioMeta" class="small"></div>
+</section>
+
+<div id="cloneModal" class="modal hidden">
+  <div class="modal-box">
+    <button class="close" onclick="hideCloneForm()">×</button>
+    <h2>🎙️ Clone Your Voice</h2>
+    <p class="small">Voice cloning endpoint can be connected to your Fish Audio setup.</p>
+
+    <input id="voiceTitle" class="input" placeholder="Voice name">
+
+    <div id="audioUrlsContainer">
+      <input class="input audio-url-input" placeholder="https://example.com/audio1.wav">
+    </div>
+
+    <button class="btn secondary" onclick="addAudioUrlInput()">➕ Add audio URL</button>
+    <button class="btn primary" onclick="submitVoiceClone()">Create Clone</button>
+  </div>
+</div>
+
+</div>
+<script src="app.js"></script>
+
+
+
+
+
+
+
+<style id="cinematic-full-clickable">
+#cinematicModeBtn.cinematic-mode-btn {
+  width: 100% !important;
+  min-height: 68px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  padding: 14px 18px !important;
+  box-sizing: border-box !important;
+  border-radius: 18px !important;
+  border: 2px solid rgba(255,255,255,.14) !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: all .2s ease !important;
+}
+
+#cinematicModeBtn.cinematic-mode-btn * {
+  pointer-events: none !important;
+}
+
+#cinematicModeBtn.cinematic-mode-btn.active {
+  border-color: rgba(255,255,255,.8) !important;
+  background: rgba(255,255,255,.16) !important;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.08),
+              0 8px 28px rgba(0,0,0,.22) !important;
+}
+
+#cinematicModeBtn.cinematic-mode-btn.active .cinematic-state {
+  background: rgba(255,255,255,.2) !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
+}
+
+#cinematicModeBtn .cinematic-state {
+  margin-inline-start: auto !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.08) !important;
+  opacity: .7 !important;
+}
+</style>
+
+
+<script id="cinematic-inline-control">
+(function () {
+  function refreshCinematicButton() {
+    const btn = document.getElementById("cinematicModeBtn");
+    if (!btn) return;
+
+    const enabled = localStorage.getItem("fish.cinematicMode") === "1";
+
+    btn.classList.toggle("active", enabled);
+    btn.setAttribute("aria-pressed", enabled ? "true" : "false");
+
+    const state = btn.querySelector(".cinematic-state");
+    if (state) state.textContent = enabled ? "مفعل" : "متوقف";
+  }
+
+  function toggleCinematicMode() {
+    const enabled = localStorage.getItem("fish.cinematicMode") === "1";
+    localStorage.setItem("fish.cinematicMode", enabled ? "0" : "1");
+    refreshCinematicButton();
+  }
+
+  function initCinematicButton() {
+    const btn = document.getElementById("cinematicModeBtn");
+    if (!btn || btn.dataset.cinematicReady === "1") return;
+
+    btn.dataset.cinematicReady = "1";
+
+    btn.addEventListener("click", function () {
+      toggleCinematicMode();
+    });
+
+    refreshCinematicButton();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initCinematicButton);
+  } else {
+    initCinematicButton();
+  }
+})();
+</script>
+
+</body>
+</html>
+<style id="clean-voice-ui-final">
+/* إخفاء الوصف الطويل ومعلومات الصوت القديمة */
+#voiceInfo,
+.voice-info,
+.voice-description,
+.voice-long-description,
+.voice-meta-description,
+.voice-result-status,
+.voice-load-status,
+.voice-load-more,
+#loadMoreVoices,
+#refreshVoices,
+.voice-refresh,
+.voice-results-actions,
+.voice-pagination,
+.voice-loading-status {
+  display: none !important;
+}
+
+/* أي عناصر قديمة فيها Load More / Refresh */
+button[data-action="load-more"],
+button[data-action="refresh"],
+button.load-more,
+button.refresh-voices {
+  display: none !important;
+}
+</style>
+
+<style id="force-save-button">
+#voiceSearchResultsBox .voice-card-save,
+#voiceSearchResultsBox button[data-voice-save] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 9999 !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  height: 52px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 0 !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  font-size: 23px !important;
+  color: inherit !important;
+}
+</style>
+<style id="recent-voices-final">
+#recentVoicesBox {
+  width: 100%;
+  margin: 14px 0;
+}
+
+.recent-voices-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.recent-voices-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+}
+
+.recent-voice-item {
+  position: relative;
+  flex: 0 0 auto;
+  width: 90px;
+  text-align: center;
+}
+
+.recent-voice-main {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.06);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: inherit;
+}
+
+.recent-voice-icon {
+  font-size: 25px;
+}
+
+.recent-voice-name {
+  max-width: 68px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.recent-voice-delete {
+  position: absolute;
+  top: -2px;
+  right: 5px;
+  width: 23px;
+  height: 23px;
+  border: 0;
+  border-radius: 50%;
+  background: #d33;
+  color: white;
+  font-size: 16px;
+  line-height: 23px;
+  cursor: pointer;
+}
+</style>
+<style id="recent-voices-final">
+#recentVoicesBox {
+  width: 100%;
+  margin: 14px 0;
+}
+
+.recent-voices-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.recent-voices-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+}
+
+.recent-voice-item {
+  position: relative;
+  flex: 0 0 auto;
+  width: 90px;
+  text-align: center;
+}
+
+.recent-voice-main {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.06);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: inherit;
+}
+
+.recent-voice-icon {
+  font-size: 25px;
+}
+
+.recent-voice-name {
+  max-width: 68px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.recent-voice-delete {
+  position: absolute;
+  top: -2px;
+  right: 5px;
+  width: 23px;
+  height: 23px;
+  border: 0;
+  border-radius: 50%;
+  background: #d33;
+  color: white;
+  font-size: 16px;
+  line-height: 23px;
+  cursor: pointer;
+}
+</style>
+
+<style id="recent-voices-independent">
+#recentVoicesSection {
+  display: none;
+  width: 100%;
+  margin: 18px 0 22px;
+}
+
+#recentVoicesSection #recentVoicesBox {
+  width: 100%;
+}
+
+#recentVoicesSection .recent-voices-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+#recentVoicesSection .recent-voices-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+#recentVoicesSection .recent-voice-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+#recentVoicesSection .recent-voice-main {
+  min-height: 54px;
+  min-width: 120px;
+  padding: 7px 12px 7px 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 28px;
+  background: rgba(255,255,255,.055);
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+#recentVoicesSection .recent-voice-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.08);
+  flex: 0 0 38px;
+}
+
+#recentVoicesSection .recent-voice-name {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#recentVoicesSection .recent-voice-delete {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,.08);
+  color: inherit;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+#recentVoicesSection .recent-voice-main:hover,
+#recentVoicesSection .recent-voice-delete:hover {
+  background: rgba(255,255,255,.12);
+}
+</style>
+
+<style id="professional-mobile-ui">
+
+:root{
+  --pro-bg:#07111f;
+  --pro-panel:#0c1829;
+  --pro-panel-2:#101f33;
+  --pro-border:rgba(148,163,184,.16);
+  --pro-text:#edf4ff;
+  --pro-muted:#8fa1b8;
+  --pro-accent:#4f8cff;
+  --pro-accent-2:#7c5cff;
+}
+
+html,body{
+  background:
+    radial-gradient(circle at 50% -10%,rgba(79,140,255,.12),transparent 34%),
+    var(--pro-bg) !important;
+  color:var(--pro-text) !important;
+}
+
+body{
+  min-width:0;
+}
+
+.container{
+  width:100%;
+  max-width:760px !important;
+  margin:0 auto;
+  padding:14px !important;
+}
+
+.card{
+  background:linear-gradient(180deg,var(--pro-panel),rgba(12,24,41,.92)) !important;
+  border:1px solid var(--pro-border);
+  border-radius:22px !important;
+  box-shadow:0 18px 50px rgba(0,0,0,.22) !important;
+}
+
+.hero{
+  position:relative;
+  padding:30px 8px 24px !important;
+  text-align:center;
+}
+
+.hero-mark{
+  width:58px;
+  height:58px;
+  margin:0 auto 15px;
+  border:1px solid rgba(79,140,255,.35);
+  border-radius:18px;
+  display:grid;
+  place-items:center;
+  color:#76a9ff;
+  background:rgba(79,140,255,.08);
+}
+
+.hero h1{
+  font-size:clamp(27px,7vw,42px) !important;
+  line-height:1.15;
+  letter-spacing:-.6px;
+  margin:0 0 10px !important;
+}
+
+.hero p{
+  color:var(--pro-muted) !important;
+  font-size:14px;
+  margin:0 auto !important;
+  max-width:430px;
+}
+
+.hero-wave{
+  height:42px;
+  margin:20px auto 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+}
+
+.hero-wave span{
+  width:3px;
+  border-radius:20px;
+  background:linear-gradient(180deg,#6ea4ff,#765cff);
+  opacity:.8;
+}
+
+.hero-wave span:nth-child(1),
+.hero-wave span:nth-child(15){height:10px}
+.hero-wave span:nth-child(2),
+.hero-wave span:nth-child(14){height:17px}
+.hero-wave span:nth-child(3),
+.hero-wave span:nth-child(13){height:27px}
+.hero-wave span:nth-child(4),
+.hero-wave span:nth-child(12){height:35px}
+.hero-wave span:nth-child(5),
+.hero-wave span:nth-child(11){height:24px}
+.hero-wave span:nth-child(6),
+.hero-wave span:nth-child(10){height:39px}
+.hero-wave span:nth-child(7),
+.hero-wave span:nth-child(9){height:22px}
+.hero-wave span:nth-child(8){height:34px}
+
+.hero-points{
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:9px;
+}
+
+.hero-points span{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 10px;
+  border:1px solid var(--pro-border);
+  border-radius:999px;
+  color:#b9c8db;
+  font-size:11px;
+  background:rgba(255,255,255,.025);
+}
+
+.hero-points svg{
+  width:15px;
+  height:15px;
+  color:#75a6ff;
+}
+
+.section-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:16px;
+}
+
+.section-heading h2{
+  margin:3px 0 0 !important;
+  font-size:21px;
+}
+
+.eyebrow{
+  color:#709cff;
+  font-size:9px;
+  letter-spacing:1.8px;
+  font-weight:800;
+}
+
+.section-dot{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#5e96ff;
+  box-shadow:0 0 18px rgba(94,150,255,.55);
+}
+
+.voice-modern{
+  width:100%;
+}
+
+.voice-search-wrap{
+  margin:0 0 11px !important;
+}
+
+.voice-modern-search{
+  min-height:52px;
+  background:rgba(4,12,23,.55) !important;
+  border:1px solid var(--pro-border) !important;
+  color:var(--pro-text) !important;
+  border-radius:16px !important;
+  box-shadow:none !important;
+}
+
+.voice-modern-search:focus{
+  border-color:rgba(79,140,255,.65) !important;
+  box-shadow:0 0 0 3px rgba(79,140,255,.09) !important;
+}
+
+.voice-search-icon{
+  color:#7594bc;
+}
+
+.voice-filters-pro{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:8px;
+  margin:0 0 14px;
+}
+
+.filter-field{
+  min-width:0;
+}
+
+.filter-field span{
+  display:block;
+  margin:0 0 6px 3px;
+  color:var(--pro-muted);
+  font-size:11px;
+}
+
+.filter-field select{
+  width:100%;
+  min-height:46px;
+  padding:0 12px;
+  border-radius:13px;
+  border:1px solid var(--pro-border);
+  background:rgba(255,255,255,.035);
+  color:var(--pro-text);
+  outline:none;
+  font-size:13px;
+}
+
+.filter-field select:focus{
+  border-color:rgba(79,140,255,.65);
+}
+
+.recent-voices-title{
+  color:#dce8f8 !important;
+  font-size:14px !important;
+}
+
+.recent-voices-list{
+  scrollbar-width:none;
+}
+
+.recent-voices-list::-webkit-scrollbar{
+  display:none;
+}
+
+.recent-voice-main{
+  background:linear-gradient(145deg,#13243b,#0c1829) !important;
+  border:1px solid rgba(100,145,210,.22) !important;
+  box-shadow:none !important;
+}
+
+.recent-voice-main:hover{
+  border-color:rgba(79,140,255,.55) !important;
+}
+
+.recent-voice-icon{
+  font-size:0 !important;
+  position:relative;
+}
+
+.recent-voice-icon:after{
+  content:"";
+  width:22px;
+  height:22px;
+  border:1.6px solid #7ea9e8;
+  border-radius:50%;
+  display:block;
+  box-sizing:border-box;
+}
+
+.voice-results-head{
+  margin-top:17px !important;
+}
+
+.voice-results-title{
+  font-size:14px !important;
+  color:#dce8f8;
+}
+
+.voice-cards{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  gap:9px !important;
+}
+
+.voice-card{
+  min-height:82px !important;
+  padding:8px !important;
+  border-radius:17px !important;
+  background:linear-gradient(145deg,rgba(17,34,56,.9),rgba(9,20,34,.96)) !important;
+  border:1px solid var(--pro-border) !important;
+  box-shadow:none !important;
+}
+
+.voice-card:hover{
+  transform:none !important;
+}
+
+.voice-card-main{
+  padding:8px 7px !important;
+}
+
+.voice-card-icon{
+  width:44px !important;
+  height:44px !important;
+  min-width:44px !important;
+  border-radius:13px !important;
+  background:rgba(79,140,255,.08) !important;
+  font-size:0 !important;
+  position:relative;
+}
+
+.voice-card-icon:before{
+  content:"";
+  width:19px;
+  height:25px;
+  border:1.6px solid #79a9e8;
+  border-radius:10px;
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-55%);
+}
+
+.voice-card-icon:after{
+  content:"";
+  width:25px;
+  height:12px;
+  border:1.6px solid #79a9e8;
+  border-top:0;
+  border-radius:0 0 14px 14px;
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,5%);
+}
+
+.voice-card-name{
+  color:#edf4ff !important;
+}
+
+.voice-card-tag{
+  background:rgba(255,255,255,.055) !important;
+  color:#9eb0c7 !important;
+  border:1px solid rgba(255,255,255,.05);
+}
+
+.voice-card-save{
+  font-size:0 !important;
+  width:42px !important;
+  min-width:42px !important;
+  height:42px !important;
+  margin:10px 7px 0 0;
+  border-radius:12px !important;
+  background:rgba(79,140,255,.07) !important;
+}
+
+.voice-card-save:before{
+  content:"";
+  width:17px;
+  height:19px;
+  border:1.6px solid #7ea9e8;
+  border-radius:3px;
+  display:block;
+  margin:auto;
+  box-sizing:border-box;
+}
+
+.voice-card-save:after{
+  content:"";
+  width:9px;
+  height:5px;
+  border-left:1.6px solid #7ea9e8;
+  border-bottom:1.6px solid #7ea9e8;
+  transform:rotate(-45deg);
+  display:block;
+  position:absolute;
+  right:50%;
+  top:50%;
+  margin:-3px -4px 0 0;
+}
+
+.voice-selected{
+  color:#73a5ff !important;
+}
+
+.emotions{
+  grid-template-columns:repeat(2,1fr) !important;
+  gap:8px !important;
+}
+
+.emotion{
+  min-height:45px;
+  background:rgba(255,255,255,.035) !important;
+  color:#b8c6d8 !important;
+  border:1px solid var(--pro-border) !important;
+  border-radius:13px !important;
+}
+
+.emotion.active{
+  background:rgba(79,140,255,.14) !important;
+  color:#dceaff !important;
+  border-color:rgba(79,140,255,.58) !important;
+}
+
+#cinematicModeBtn{
+  background:rgba(255,255,255,.035) !important;
+  border:1px solid var(--pro-border) !important;
+  color:#c7d5e6 !important;
+  border-radius:14px !important;
+}
+
+#generateBtn{
+  min-height:54px;
+  border-radius:15px !important;
+  background:linear-gradient(135deg,#367cf5,#6756e9) !important;
+  box-shadow:0 12px 28px rgba(61,111,238,.18);
+}
+
+.ad-slot{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  min-height:82px;
+  padding:15px;
+  margin:16px 0;
+  border:1px dashed rgba(117,145,181,.28);
+  border-radius:18px;
+  background:rgba(255,255,255,.018);
+  color:#9aacbf;
+}
+
+.ad-slot-icon{
+  width:42px;
+  height:42px;
+  min-width:42px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  background:rgba(79,140,255,.07);
+  color:#729ce0;
+}
+
+.ad-slot-icon svg{
+  width:21px;
+}
+
+.ad-slot strong{
+  display:block;
+  color:#cbd8e8;
+  font-size:13px;
+  margin-bottom:3px;
+}
+
+.ad-slot span{
+  font-size:11px;
+}
+
+.btn{
+  min-height:48px;
+}
+
+.textarea{
+  background:rgba(4,12,23,.5) !important;
+  color:var(--pro-text) !important;
+  border-color:var(--pro-border) !important;
+}
+
+.status,
+.status-box,
+.voice-info{
+  background:rgba(255,255,255,.035) !important;
+  color:var(--pro-muted) !important;
+}
+
+@media(min-width:560px){
+  .voice-filters-pro{
+    grid-template-columns:repeat(3,1fr);
+  }
+
+  .voice-cards{
+    grid-template-columns:repeat(2,1fr) !important;
+  }
+}
+
+@media(max-width:380px){
+  .container{
+    padding:9px !important;
+  }
+
+  .card{
+    padding:13px !important;
+  }
+
+  .hero{
+    padding-top:23px !important;
+  }
+
+  .hero h1{
+    font-size:25px !important;
+  }
+
+  .emotions{
+    grid-template-columns:1fr 1fr !important;
+  }
+}
+
+</style>

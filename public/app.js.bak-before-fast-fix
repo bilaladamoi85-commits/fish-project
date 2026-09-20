@@ -1,0 +1,1037 @@
+const API = location.origin;
+let voices = [];
+let page = 1;
+const pageSize = 50;
+let hasMore = true;
+let selectedEmotion = "neutral";
+let cinematicMode = localStorage.getItem("fish.cinematicMode") === "1";
+let generatedAudioUrl = "";
+let searchTimer = null;
+let generationPoller = null;
+let generationCountdownTimer = null;
+let generationRemaining = 120;
+
+const $ = id => document.getElementById(id);
+
+document.addEventListener("DOMContentLoaded", () => {
+  updateCounter();
+  setupEvents();
+  installCinematicMode();
+  checkHealth();
+  // ⚡ عرض الشخصيات المحفوظة فوراً قبل انتظار السيرفر
+  renderRecentVoicesInstant();
+
+  loadVoices(true);
+
+  const savedVoiceSearch = localStorage.getItem(VOICE_SEARCH_KEY);
+  if (savedVoiceSearch) {
+    const searchInput =
+      document.querySelector("#voiceSearch") ||
+      document.querySelector("#searchVoice") ||
+      document.querySelector('input[type="search"]');
+
+    if (searchInput) {
+      searchInput.value = savedVoiceSearch;
+      searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+  loadClonedVoices();
+
+  const savedEmotion =
+    localStorage.getItem("fish.emotion");
+
+  if (savedEmotion) {
+    selectedEmotion = savedEmotion;
+    document.querySelectorAll(".emotion").forEach(btn => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.emotion === selectedEmotion
+      );
+    });
+  }
+
+  resumeActiveJob();
+});
+
+function setupEvents() {
+  $("textInput").addEventListener("input", updateCounter);
+
+  document.querySelectorAll(".emotion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".emotion").forEach(x => x.classList.remove("active"));
+      btn.classList.add("active");
+      selectedEmotion = btn.dataset.emotion;
+    localStorage.setItem('fish_selected_emotion', selectedEmotion);
+    });
+  });
+
+  $("voiceSearch").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadVoices(true), 300);
+  });
+
+  $("languageSelect").addEventListener("change", () => loadVoices(true));
+  $("loadMoreBtn")?.addEventListener("click", () => loadVoices(false));
+  $("refreshBtn")?.addEventListener("click", () => loadVoices(true));
+
+  setupVoiceFilters();
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/api/health`);
+    const d = await r.json();
+
+    $("healthStatus").textContent = d.fishConfigured
+      ? "Voice Studio connected"
+      : "🔴 Voice Studio API key missing";
+
+    $("healthStatus").className = d.fishConfigured
+      ? "status ok"
+      : "status error";
+  } catch {
+    $("healthStatus").textContent = "🔴 Server unavailable";
+    $("healthStatus").className = "status error";
+  }
+}
+
+
+function renderRecentVoicesInstant() {
+  const recent = getRecentVoices();
+  if (!recent.length) return;
+
+  // Put saved voices in memory immediately.
+  for (const rv of recent) {
+    if (!rv || !rv.id) continue;
+    if (!voices.some(v => String(v.id) === String(rv.id))) {
+      voices.push(rv);
+    }
+  }
+
+  renderRecentVoices();
+}
+
+async function loadVoices(reset = false) {
+  const search = $("voiceSearch").value.trim();
+  const language = $("languageSelect")?.value || "";
+
+  if (reset) {
+    page = 1;
+    hasMore = true;
+
+    // ⚡ Keep saved voices visible while API loads.
+    const savedRecent = getRecentVoices();
+    voices = savedRecent.filter(v => v && v.id);
+
+    $("voiceSelect").innerHTML = `<option value="">Loading voices...</option>`;
+    renderRecentVoices();
+  }
+
+  if (!hasMore && !reset) return;
+
+  const loadMoreBtn = $("loadMoreBtn");
+  if (loadMoreBtn) {
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = "⏳ Loading...";
+  }
+
+  try {
+    const params = new URLSearchParams({
+      page: page,
+      pageSize: pageSize
+    });
+
+    if (search) params.set("search", search);
+    if (language) params.set("language", language);
+
+    const r = await fetch(`${API}/api/voices?${params}`);
+    if (!r.ok) throw new Error("Voice request failed");
+
+    const data = await r.json();
+    const items = data.voices || data.models || data.items || [];
+
+    if (reset) voices = [];
+
+    const existing = new Set(voices.map(v => v.id));
+    for (const v of items) {
+      if (v.id && !existing.has(v.id)) voices.push(v);
+    }
+
+    // Restore saved recent voices from localStorage after voices are loaded.
+    const savedRecent = getRecentVoices();
+    for (const rv of savedRecent) {
+      if (!rv || !rv.id) continue;
+      if (!voices.some(v => String(v.id) === String(rv.id))) {
+        voices.push(rv);
+      }
+    }
+
+    hasMore = Boolean(data.hasMore) || items.length >= pageSize;
+    page++;
+
+    renderVoices();
+    renderVoiceSearchResults();
+
+    $("voiceStatus").textContent =
+      `✅  (${voices.length})`;
+  } catch (e) {
+    $("voiceStatus").textContent = "❌ تعذر تحميل الأصوات: " + e.message;
+  } finally {
+    if (loadMoreBtn) loadMoreBtn.disabled = !hasMore;
+    $("loadMoreBtn").textContent =
+      hasMore ? "⬇️ " : "✅ All loaded";
+  }
+}
+
+function renderVoices() {
+  const select = $("voiceSelect");
+  const previous = select.value;
+
+  select.innerHTML = "";
+
+  if (!voices.length) {
+    select.innerHTML = `<option value="">No voices found</option>`;
+    $("voiceInfo").textContent = "";
+    return;
+  }
+
+  voices.forEach((v, i) => {
+    const option = document.createElement("option");
+    option.value = v.id || "";
+    option.textContent =
+      v.title ||
+      v.name ||
+      `Voice ${i + 1}`;
+    select.appendChild(option);
+  });
+
+  const savedVoice = localStorage.getItem("fish.voiceId");
+
+  if (savedVoice && voices.some(v => v.id === savedVoice)) {
+    select.value = savedVoice;
+  } else if (voices.some(v => v.id === previous)) {
+    select.value = previous;
+  }
+
+  showVoiceInfo();
+  renderRecentVoices();
+  renderVoiceSearchResults();
+
+  select.onchange = () => {
+    showVoiceInfo();
+
+    if (select.value) {
+      localStorage.setItem("fish.voiceId", select.value);
+      rememberRecentVoice(select.value);
+    }
+
+    renderRecentVoices();
+  };
+}
+
+/* ===== Voice Search Results with Save Buttons ===== */
+function voiceText(v) {
+  return [
+    v.title,
+    v.name,
+    v.nickname,
+    v.gender,
+    v.sex,
+    v.language,
+    v.languages,
+    v.country,
+    v.countryCode,
+    v.country_code,
+    v.tags,
+    v.labels,
+    v.category,
+    v.style
+  ].flat().filter(Boolean).join(" ").toLowerCase();
+}
+
+function voiceGender(v) {
+  const x = voiceText(v);
+  if (/\b(female|woman|girl|fem|womanly|lady)\b/.test(x)) return "female";
+  if (/\b(male|man|boy|masc|gentleman)\b/.test(x)) return "male";
+  return "";
+}
+
+function voiceCountry(v) {
+  return String(
+    v.country ||
+    v.countryName ||
+    v.country_code ||
+    v.countryCode ||
+    ""
+  ).trim();
+}
+
+function voiceStyles(v) {
+  const raw = [
+    v.style,
+    v.styles,
+    v.category,
+    v.categories,
+    v.tags,
+    v.labels
+  ].flat().filter(Boolean);
+
+  return raw
+    .flatMap(x => String(x).split(/[,\|;]+/))
+    .map(x => x.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function voiceLanguage(v) {
+  return String(
+    v.language ||
+    v.lang ||
+    v.locale ||
+    (Array.isArray(v.languages) ? v.languages[0] : v.languages) ||
+    ""
+  ).trim();
+}
+
+function renderVoiceFilters(items) {
+  const countrySelect = $("voiceCountrySelect");
+  const styleSelect = $("voiceStyleSelect");
+
+  if (!countrySelect || !styleSelect) return;
+
+  const oldCountry = countrySelect.value;
+  const oldStyle = styleSelect.value;
+
+  const countries = [...new Set(
+    items.map(voiceCountry).filter(Boolean)
+  )].sort();
+
+  const styles = [...new Set(
+    items.flatMap(voiceStyles)
+  )].sort();
+
+  countrySelect.innerHTML = `<option value="">🌎 All countries</option>`;
+  countries.forEach(c => {
+    const o = document.createElement("option");
+    o.value = c;
+    o.textContent = "🌍 " + c;
+    countrySelect.appendChild(o);
+  });
+
+  styleSelect.innerHTML = `<option value="">🎭 All styles</option>`;
+  styles.slice(0, 40).forEach(st => {
+    const o = document.createElement("option");
+    o.value = st;
+    o.textContent = "🎭 " + st;
+    styleSelect.appendChild(o);
+  });
+
+  if (countries.includes(oldCountry)) countrySelect.value = oldCountry;
+  if (styles.includes(oldStyle)) styleSelect.value = oldStyle;
+}
+
+function setupVoiceFilters() {
+  ["voiceCountrySelect", "voiceGenderSelect", "voiceStyleSelect"].forEach(id => {
+    const el = $(id);
+    if (el) {
+      el.addEventListener("change", () => {
+        renderVoiceSearchResults();
+      });
+    }
+  });
+}
+
+function renderVoiceSearchResults() {
+  const input = document.getElementById("voiceSearch");
+  const box = document.getElementById("voiceSearchResultsBox");
+  const count = document.getElementById("voiceResultCount");
+
+  if (!box) return;
+
+  const query = input ? input.value.trim().toLowerCase() : "";
+
+  if (count) count.textContent = "";
+
+  if (!query) {
+    box.innerHTML = "";
+    box.style.display = "none";
+    renderRecentVoices();
+    return;
+  }
+
+  const esc = (x) => String(x ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[ch]));
+
+  const matches = voices.filter(v => voiceText(v).includes(query));
+  const select = document.getElementById("voiceSelect");
+  const selectedId = select ? select.value : "";
+
+  if (!matches.length) {
+    box.innerHTML = '<div class="voice-no-results">No voices found</div>';
+    box.style.display = "";
+    return;
+  }
+
+  box.innerHTML = matches.map(v => {
+    const id = String(v.id || "");
+    const title = v.title || v.name || v.nickname || "Voice";
+
+    const tags = [];
+
+    const lang = voiceLanguage(v);
+    const country = voiceCountry(v);
+    const gender = voiceGender(v);
+    const styles = voiceStyles(v);
+
+    if (lang) tags.push(lang);
+    if (country) tags.push(country);
+    if (gender) tags.push(gender);
+
+    if (Array.isArray(styles)) {
+      styles.slice(0, 2).forEach(x => {
+        if (x) tags.push(x);
+      });
+    } else if (styles) {
+      String(styles).split(",").slice(0, 2).forEach(x => {
+        if (x.trim()) tags.push(x.trim());
+      });
+    }
+
+    const tagsHtml = tags.slice(0, 5)
+      .map(x => `<span class="voice-card-tag">${esc(x)}</span>`)
+      .join("");
+
+    const selected = id === selectedId;
+
+    return `
+      <div class="voice-card ${selected ? "selected" : ""}" data-voice-id="${esc(id)}">
+
+        <button
+          type="button"
+          class="voice-card-main"
+          data-voice-select="${esc(id)}"
+        >
+          <div class="voice-card-icon">🎙️</div>
+
+          <div class="voice-card-body">
+            <div class="voice-card-name">
+              ${esc(title)}
+              ${selected ? '<span class="voice-card-check">✓</span>' : ''}
+            </div>
+
+            <div class="voice-card-tags">
+              ${tagsHtml}
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          class="voice-card-save"
+          data-voice-save="${esc(id)}"
+          title="Save voice"
+          aria-label="Save voice"
+        >💾</button>
+
+      </div>
+    `;
+  }).join("");
+
+  box.style.display = "";
+
+  // SAVE BUTTON
+  box.querySelectorAll("[data-voice-save]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const id = btn.getAttribute("data-voice-save");
+      if (!id) return;
+
+      rememberRecentVoice(id);
+      renderRecentVoices();
+
+      btn.textContent = "✓";
+
+      setTimeout(() => {
+        if (btn.isConnected) btn.textContent = "💾";
+      }, 900);
+    });
+  });
+
+  // SELECT VOICE
+  box.querySelectorAll("[data-voice-select]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+
+      const id = btn.getAttribute("data-voice-select");
+      if (!id) return;
+
+      const select = document.getElementById("voiceSelect");
+      if (!select) return;
+
+      const v = voices.find(x => String(x.id) === String(id));
+
+      let option = [...select.options].find(o => o.value === id);
+
+      if (!option && v) {
+        option = new Option(
+          v.title || v.name || v.nickname || "Voice",
+          id
+        );
+        select.add(option);
+      }
+
+      select.value = id;
+      localStorage.setItem("fish.voiceId", id);
+
+      select.dispatchEvent(
+        new Event("change", { bubbles: true })
+      );
+
+      rememberRecentVoice(id);
+      renderRecentVoices();
+      renderVoiceSearchResults();
+    });
+  });
+}
+
+
+/* ===== Recent Voices ===== */
+const RECENT_VOICES_KEY = "fish.recentVoices";
+const RECENT_VOICES_MAX = 10;
+
+function getRecentVoices() {
+  try {
+    const data = JSON.parse(localStorage.getItem(RECENT_VOICES_KEY) || "[]");
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberRecentVoice(id) {
+  if (!id) return;
+
+  const voice = voices.find(v => v.id === id);
+  if (!voice) return;
+
+  const item = {
+    ...voice,
+    id: voice.id,
+    title: voice.title || voice.name || voice.nickname || "Voice"
+  };
+
+  let recent = getRecentVoices();
+
+  recent = recent.filter(v => v.id !== item.id);
+  recent.unshift(item);
+  recent = recent.slice(0, RECENT_VOICES_MAX);
+
+  localStorage.setItem(RECENT_VOICES_KEY, JSON.stringify(recent));
+}
+
+
+
+function renderRecentVoices() {
+  const recent = getRecentVoices();
+
+  let box = document.getElementById("recentVoicesBox");
+
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "recentVoicesBox";
+    box.className = "recent-voices-box";
+
+    const searchBox = document.getElementById("voiceSearchResultsBox");
+
+    if (searchBox && searchBox.parentNode) {
+      searchBox.parentNode.insertBefore(box, searchBox);
+    } else {
+      const voiceSearch = document.getElementById("voiceSearch");
+      if (voiceSearch && voiceSearch.parentNode) {
+        voiceSearch.parentNode.appendChild(box);
+      }
+    }
+  }
+
+  if (!recent.length) {
+    box.innerHTML = "";
+    box.style.display = "none";
+    return;
+  }
+
+  const esc = x => String(x ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[ch]));
+
+  box.innerHTML = `
+    <div class="recent-voices-title">🕘 آخر الأصوات المحفوظة</div>
+    <div class="recent-voices-list">
+      ${recent.map(v => `
+        <div class="recent-voice-item" data-recent-id="${esc(v.id)}">
+          <button type="button"
+                  class="recent-voice-main"
+                  data-recent-select="${esc(v.id)}">
+            <span class="recent-voice-icon">🎙️</span>
+            <span class="recent-voice-name">${esc(v.title || v.name || "Voice")}</span>
+          </button>
+          <button type="button"
+                  class="recent-voice-delete"
+                  data-recent-delete="${esc(v.id)}">×</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  box.style.display = "";
+
+  box.querySelectorAll("[data-recent-select]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-recent-select");
+      const saved = getRecentVoices().find(v => String(v.id) === String(id));
+      if (!saved) return;
+
+      const select = document.getElementById("voiceSelect");
+      if (select) {
+        let option = [...select.options].find(o => String(o.value) === String(id));
+
+        if (!option) {
+          option = new Option(
+            saved.title || saved.name || saved.nickname || "Voice",
+            saved.id
+          );
+          select.add(option);
+        }
+
+        select.value = saved.id;
+        localStorage.setItem("fish.voiceId", saved.id);
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      renderRecentVoices();
+    });
+  });
+
+  box.querySelectorAll("[data-recent-delete]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const id = btn.getAttribute("data-recent-delete");
+
+      const updated = getRecentVoices().filter(
+        v => String(v.id) !== String(id)
+      );
+
+      localStorage.setItem(
+        RECENT_VOICES_KEY,
+        JSON.stringify(updated)
+      );
+
+      renderRecentVoices();
+    });
+  });
+}
+
+function showVoiceInfo() {
+  const box = document.getElementById("voiceInfo");
+  if (box) box.innerHTML = "";
+}
+
+function updateCounter() {
+  const n = $("textInput").value.length;
+  $("charCount").textContent =
+    `${n.toLocaleString()} / 50,000 characters`;
+
+  if (n > 8000) {
+    const chunks = Math.ceil(n / 900);
+    $("chunkInfo").textContent =
+      `⚡ ~${chunks} chunks × ~900 chars • 10 parallel`;
+  } else {
+    $("chunkInfo").textContent =
+      "⚡ Single request";
+  }
+}
+
+async function generateSpeech() {
+  const text = $("textInput").value.trim();
+  const voiceId = $("voiceSelect").value;
+  const ttsText = cinematicMode ? prepareCinematicText(text) : text;
+
+  if (!text) {
+    showStatus("⚠️ كتب النص أولاً", "error");
+    return;
+  }
+
+  if (!voiceId) {
+    showStatus("⚠️ اختار Voice أولاً", "error");
+    return;
+  }
+
+  if (text.length > 50000) {
+    showStatus("⚠️ الحد الأقصى هو 50,000 حرف", "error");
+    return;
+  }
+
+  localStorage.setItem("fish.voiceId", voiceId);
+  localStorage.setItem("fish.emotion", selectedEmotion);
+  rememberRecentVoice(voiceId);
+  renderRecentVoices();
+  localStorage.setItem("fish.text", text);
+
+  const active = localStorage.getItem("fish.activeJobId");
+
+  if (active) {
+    try {
+      const r = await fetch(`${API}/api/tts-progress/${active}`, {
+        cache: "no-store"
+      });
+      if (r.ok) {
+        const old = await r.json();
+        if (!old.finished && !old.failed) {
+          startJobWatcher(active);
+          return;
+        }
+      }
+    } catch (_) {}
+  }
+
+  const jobId =
+    (crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+  localStorage.setItem("fish.activeJobId", jobId);
+
+  startJobWatcher(jobId);
+
+  try {
+    const response = await fetch(`${API}/api/tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-TTS-Job-Id": jobId
+      },
+      body: JSON.stringify({
+        text,
+        voiceId,
+        emotion: selectedEmotion
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "TTS request failed");
+    }
+
+    if (data.jobId && data.jobId !== jobId) {
+      localStorage.setItem("fish.activeJobId", data.jobId);
+      startJobWatcher(data.jobId);
+    }
+
+  } catch (error) {
+    stopJobWatcher();
+    localStorage.removeItem("fish.activeJobId");
+    showStatus("❌ " + error.message, "error");
+    $("generateBtn").disabled = false;
+    $("generateBtn").textContent = "🎙️ Generate Speech";
+  }
+}
+
+function stopJobWatcher() {
+  clearInterval(generationCountdownTimer);
+  clearInterval(generationPoller);
+  generationCountdownTimer = null;
+  generationPoller = null;
+}
+
+function startJobWatcher(jobId) {
+  stopJobWatcher();
+
+  $("progressBox").classList.remove("hidden");
+  $("audioSection").classList.add("hidden");
+
+  const btn = $("generateBtn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Generating...";
+
+  let estimatedTotalSeconds = 120;
+  let finished = false;
+
+  const update = async () => {
+    if (finished) return;
+
+    try {
+      const r = await fetch(
+        `${API}/api/tts-progress/${encodeURIComponent(jobId)}`,
+        { cache: "no-store" }
+      );
+
+      if (!r.ok) return;
+
+      const p = await r.json();
+
+      const started =
+        Number(p.startedAt) || Date.now();
+
+      const elapsed =
+        Math.floor((Date.now() - started) / 1000);
+
+      $("elapsedTime").textContent =
+        `${elapsed}s`;
+
+      if (
+        p.eta !== null &&
+        Number.isFinite(Number(p.eta))
+      ) {
+        estimatedTotalSeconds =
+          Math.max(
+            estimatedTotalSeconds,
+            elapsed + Number(p.eta)
+          );
+      }
+
+      const remaining =
+        p.finished
+          ? 0
+          : Math.max(
+              1,
+              Math.ceil(
+                estimatedTotalSeconds - elapsed
+              )
+            );
+
+      $("remainingTime").textContent =
+        `${remaining}s`;
+
+      if (p.failed) {
+        finished = true;
+        stopJobWatcher();
+        localStorage.removeItem("fish.activeJobId");
+        showStatus(
+          "❌ " + (p.error || "فشل إنشاء الصوت"),
+          "error"
+        );
+        btn.disabled = false;
+        btn.textContent = "🎙️ Generate Speech";
+        return;
+      }
+
+      if (p.merging) {
+        setProgress(
+          98,
+          `🔄 دمج الصوت... • ${p.completed}/${p.total}`
+        );
+      } else if (p.total > 1) {
+        const percent =
+          Math.min(
+            94,
+            8 + Math.round(
+              (Number(p.completed) / Number(p.total)) * 90
+            )
+          );
+
+        setProgress(
+          percent,
+          `🎙️ جاري التوليد... • ${p.completed}/${p.total}`
+        );
+      } else {
+        setProgress(
+          15,
+          "🎙️ جاري توليد الصوت..."
+        );
+      }
+
+      if (p.finished && p.audioUrl) {
+        finished = true;
+        stopJobWatcher();
+
+        $("elapsedTime").textContent =
+          `${Math.floor(
+            Number(p.processingSeconds || elapsed)
+          )}s`;
+
+        $("remainingTime").textContent = "0s";
+
+        setProgress(
+          100,
+          "✅ الصوت جاهز"
+        );
+
+        generatedAudioUrl =
+          p.audioUrl.startsWith("http")
+            ? p.audioUrl
+            : `${API}${p.audioUrl}`;
+
+        localStorage.setItem(
+          "fish.generatedAudioUrl",
+          generatedAudioUrl
+        );
+
+        $("audioPlayer").src = generatedAudioUrl;
+        $("audioPlayer").load();
+
+        $("audioSection").classList.remove("hidden");
+
+        btn.disabled = false;
+        btn.textContent = "🎙️ Generate Speech";
+
+        localStorage.removeItem("fish.activeJobId");
+
+        showStatus(
+          `✅ تم إنشاء الصوت في ${Number(
+            p.processingSeconds || elapsed
+          ).toFixed(1)}s`,
+          "success"
+        );
+      }
+    } catch (_) {}
+  };
+
+  update();
+  generationPoller = setInterval(update, 700);
+  generationCountdownTimer = setInterval(update, 1000);
+}
+
+async function resumeActiveJob() {
+  const jobId =
+    localStorage.getItem("fish.activeJobId");
+
+  if (!jobId) return;
+
+  $("progressBox").classList.remove("hidden");
+
+  startJobWatcher(jobId);
+
+  try {
+    const r = await fetch(
+      `${API}/api/tts-progress/${encodeURIComponent(jobId)}`,
+      { cache: "no-store" }
+    );
+
+    if (!r.ok) {
+      localStorage.removeItem("fish.activeJobId");
+      stopJobWatcher();
+      $("progressBox").classList.add("hidden");
+      $("generateBtn").disabled = false;
+      $("generateBtn").textContent = "🎙️ Generate Speech";
+    }
+  } catch (_) {}
+}
+
+function setProgress(percent, text) {
+  $("progressFill").style.width = percent + "%";
+  $("progressText").textContent = text;
+}
+
+function showStatus(message, type) {
+  const box = $("statusBox");
+  box.textContent = message;
+  box.className = "status-box " + type;
+}
+
+function downloadAudio() {
+  if (!generatedAudioUrl) {
+    generatedAudioUrl =
+      localStorage.getItem("fish.generatedAudioUrl") || "";
+  }
+
+  if (!generatedAudioUrl) {
+    showStatus("⚠️ ما كاين حتى صوت جاهز للتحميل", "error");
+    return;
+  }
+
+  const a = document.createElement("a");
+  a.href = generatedAudioUrl;
+  a.download = "fish-audio.mp3";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function copyAudioUrl() {
+  if (!generatedAudioUrl) {
+    showStatus("⚠️ ما كاين حتى صوت جاهز", "error");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(generatedAudioUrl);
+    showStatus("📋 تم نسخ رابط الصوت", "success");
+  } catch {
+    showStatus("⚠️ المتصفح منع نسخ الرابط", "error");
+  }
+}
+
+async function loadClonedVoices() { return; }
+
+function showCloneForm() {
+  $("cloneModal").classList.remove("hidden");
+}
+
+function hideCloneForm() {
+  $("cloneModal").classList.add("hidden");
+}
+
+function addAudioUrlInput() {
+  const input = document.createElement("input");
+  input.className = "input audio-url-input";
+  input.placeholder = "https://example.com/audio.wav";
+  $("audioUrlsContainer").appendChild(input);
+}
+
+async function submitVoiceClone() {
+  const title = $("voiceTitle").value.trim();
+  const audioUrls = [...document.querySelectorAll(".audio-url-input")]
+    .map(x => x.value.trim())
+    .filter(Boolean);
+
+  if (!title || !audioUrls.length) {
+    alert("دخل اسم الصوت ورابط صوت واحد على الأقل.");
+    return;
+  }
+
+  try {
+    const r = await fetch(`${API}/api/clone-voice`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({title, audioUrls})
+    });
+
+    const d = await r.json();
+
+    if (!r.ok) throw new Error(d.error || "Clone failed");
+
+    hideCloneForm();
+    await loadClonedVoices();
+
+  const savedEmotion =
+    localStorage.getItem("fish.emotion");
+
+  if (savedEmotion) {
+    selectedEmotion = savedEmotion;
+    document.querySelectorAll(".emotion").forEach(btn => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.emotion === selectedEmotion
+      );
+    });
+  }
+
+  resumeActiveJob();
+    showStatus("✅ تم إنشاء الصوت المستنسخ", "success");
+  } catch (e) {
+    showStatus("❌ " + e.message, "error");
+  }
+}

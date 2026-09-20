@@ -1,0 +1,1590 @@
+const API = location.origin;
+let voices = [];
+let page = 1;
+const pageSize = 50;
+let hasMore = true;
+let selectedEmotion = "neutral";
+let cinematicMode = localStorage.getItem("fish.cinematicMode") === "1";
+let generatedAudioUrl = "";
+let searchTimer = null;
+let generationPoller = null;
+let generationCountdownTimer = null;
+let generationRemaining = 120;
+
+const $ = id => document.getElementById(id);
+
+document.addEventListener("DOMContentLoaded", () => {
+  updateCounter();
+  setupEvents();
+  // cinematicMode يتعالج من الواجهة مباشرة
+  checkHealth();
+
+  // Recent voices تظهر مباشرة.
+  // ممنوع تحميل قائمة Fish عند فتح الصفحة.
+  try {
+    renderRecentVoices();
+    renderVoiceSearchResults();
+  } catch (e) {
+    console.warn("recent voices:", e);
+  }
+loadClonedVoices();
+
+  const savedEmotion = localStorage.getItem("fish.emotion");
+  if (savedEmotion) {
+    selectedEmotion = savedEmotion;
+    document.querySelectorAll(".emotion").forEach(btn => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.emotion === selectedEmotion
+      );
+    });
+  }
+
+  resumeActiveJob();
+});
+
+function setupEvents() {
+  $("textInput")?.addEventListener("input", updateCounter);
+
+  document.querySelectorAll(".emotion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".emotion").forEach(x => x.classList.remove("active"));
+      btn.classList.add("active");
+      selectedEmotion = btn.dataset.emotion;
+    localStorage.setItem('fish_selected_emotion', selectedEmotion);
+    });
+  });
+
+  $("voiceSearch")?.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+
+    const input = $("voiceSearch");
+    const query = input?.value?.trim() || "";
+
+    if (!query) {
+      voices = getRecentVoices().filter(v => v && v.id);
+      renderRecentVoices();
+      renderVoiceSearchResults();
+
+      const select = $("voiceSelect");
+      if (select) {
+        select.innerHTML = '<option value="">اختار صوت من البحث</option>';
+      }
+
+      const status = $("voiceStatus");
+      if (status) status.textContent = "";
+
+      return;
+    }
+
+    searchTimer = setTimeout(() => {
+      loadVoices(true).catch(e => console.error("voice search:", e));
+    }, 300);
+  });
+
+  $("languageSelect")?.addEventListener("change", () => loadVoices(true));
+  $("loadMoreBtn")?.addEventListener("click", () => loadVoices(false));
+  $("refreshBtn")?.addEventListener("click", () => loadVoices(true));
+
+  setupVoiceFilters();
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/api/health`);
+    const d = await r.json();
+
+    $("healthStatus").textContent = d.fishConfigured
+      ? "🟢 Fish Audio connected"
+      : "🔴 Fish Audio API key missing";
+
+    $("healthStatus").className = d.fishConfigured
+      ? "status ok"
+      : "status error";
+  } catch {
+    $("healthStatus").textContent = "🔴 Server unavailable";
+    $("healthStatus").className = "status error";
+  }
+}
+
+
+async function loadVoices(reset = false) {
+  const search = $("voiceSearch")?.value?.trim() || "";
+
+  // لا يوجد بحث = لا يوجد request إلى Fish.
+  if (!search) {
+    voices = getRecentVoices().filter(v => v && v.id);
+    renderRecentVoices();
+    renderVoiceSearchResults();
+
+    const select = $("voiceSelect");
+    if (select) {
+      select.innerHTML = '<option value="">اختار صوت من البحث</option>';
+    }
+
+    const status = $("voiceStatus");
+    if (status) status.textContent = "";
+
+    return;
+  }
+
+  if (reset) {
+    page = 1;
+    hasMore = true;
+    voices = getRecentVoices().filter(v => v && v.id);
+  }
+
+  if (!hasMore && !reset) return;
+
+  const loadMoreBtn = $("loadMoreBtn");
+  if (loadMoreBtn) {
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = "⏳ Loading...";
+  }
+
+  try {
+    const params = new URLSearchParams({
+      page: page,
+      pageSize: pageSize,
+      search: search
+    });
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    let r;
+    try {
+      r = await fetch(`${API}/api/voices?${params}`, {
+        signal: controller.signal,
+        cache: "no-store"
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!r.ok) throw new Error("Voice request failed");
+
+    const data = await r.json();
+    const items = data.voices || data.models || data.items || [];
+
+    const existing = new Set(voices.map(v => String(v.id)));
+
+    for (const v of items) {
+      if (v.id && !existing.has(String(v.id))) {
+        voices.push(v);
+      }
+    }
+
+    hasMore = Boolean(data.hasMore) || items.length >= pageSize;
+    page++;
+
+    renderVoices();
+    renderVoiceSearchResults();
+
+    const status = $("voiceStatus");
+    if (status) status.textContent = "";
+  } catch (e) {
+    const status = $("voiceStatus");
+    if (status) {
+      status.textContent =
+        e.name === "AbortError"
+          ? "⚠️ البحث تأخر، حاول مرة أخرى"
+          : "❌ تعذر البحث عن الأصوات";
+    }
+
+    renderRecentVoices();
+  } finally {
+    if (loadMoreBtn) {
+      loadMoreBtn.disabled = !hasMore;
+      loadMoreBtn.textContent = hasMore ? "⬇️" : "✅";
+    }
+  }
+}
+
+function renderVoices() {
+  const select = $("voiceSelect");
+  const previous = select.value;
+
+  select.innerHTML = "";
+
+  if (!voices.length) {
+    select.innerHTML = `<option value="">No voices found</option>`;
+    $("voiceInfo").textContent = "";
+    return;
+  }
+
+  voices.forEach((v, i) => {
+    const option = document.createElement("option");
+    option.value = v.id || "";
+    option.textContent =
+      v.title ||
+      v.name ||
+      `Voice ${i + 1}`;
+    select.appendChild(option);
+  });
+
+  const savedVoice = localStorage.getItem("fish.voiceId");
+
+  if (savedVoice && voices.some(v => v.id === savedVoice)) {
+    select.value = savedVoice;
+  } else if (voices.some(v => v.id === previous)) {
+    select.value = previous;
+  }
+
+  showVoiceInfo();
+  renderRecentVoices();
+  renderVoiceSearchResults();
+
+  select.onchange = () => {
+    showVoiceInfo();
+
+    if (select.value) {
+      localStorage.setItem("fish.voiceId", select.value);
+      rememberRecentVoice(select.value);
+    }
+
+    renderRecentVoices();
+  };
+}
+
+/* ===== Voice Search Results with Save Buttons ===== */
+function voiceText(v) {
+  return [
+    v.title,
+    v.name,
+    v.nickname,
+    v.gender,
+    v.sex,
+    v.language,
+    v.languages,
+    v.country,
+    v.countryCode,
+    v.country_code,
+    v.tags,
+    v.labels,
+    v.category,
+    v.style
+  ].flat().filter(Boolean).join(" ").toLowerCase();
+}
+
+function voiceGender(v) {
+  const x = voiceText(v);
+  if (/\b(female|woman|girl|fem|womanly|lady)\b/.test(x)) return "female";
+  if (/\b(male|man|boy|masc|gentleman)\b/.test(x)) return "male";
+  return "";
+}
+
+function voiceCountry(v) {
+  return String(
+    v.country ||
+    v.countryName ||
+    v.country_code ||
+    v.countryCode ||
+    ""
+  ).trim();
+}
+
+function voiceStyles(v) {
+  const raw = [
+    v.style,
+    v.styles,
+    v.category,
+    v.categories,
+    v.tags,
+    v.labels
+  ].flat().filter(Boolean);
+
+  return raw
+    .flatMap(x => String(x).split(/[,\|;]+/))
+    .map(x => x.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function voiceLanguage(v) {
+  return String(
+    v.language ||
+    v.lang ||
+    v.locale ||
+    (Array.isArray(v.languages) ? v.languages[0] : v.languages) ||
+    ""
+  ).trim();
+}
+
+function renderVoiceFilters(items) {
+  const countrySelect = $("voiceCountrySelect");
+  const languageSelect = $("voiceLanguageSelect");
+  const genderSelect = $("voiceGenderSelect");
+
+  if (!countrySelect || !languageSelect || !genderSelect) return;
+
+  const oldCountry = countrySelect.value;
+  const oldLanguage = languageSelect.value;
+  const oldGender = genderSelect.value;
+
+  const countries = [...new Set(
+    items.map(voiceCountry).filter(Boolean)
+  )].sort();
+
+  const languages = [...new Set(
+    items.map(voiceLanguage).filter(Boolean)
+  )].sort();
+
+  countrySelect.innerHTML =
+    '<option value="">كل الدول</option>';
+
+  countries.forEach(c => {
+    const o = document.createElement("option");
+    o.value = c;
+    o.textContent = c;
+    countrySelect.appendChild(o);
+  });
+
+  languageSelect.innerHTML =
+    '<option value="">كل اللغات</option>';
+
+  languages.forEach(l => {
+    const o = document.createElement("option");
+    o.value = l;
+    o.textContent = l;
+    languageSelect.appendChild(o);
+  });
+
+  if (countries.includes(oldCountry))
+    countrySelect.value = oldCountry;
+
+  if (languages.includes(oldLanguage))
+    languageSelect.value = oldLanguage;
+
+  genderSelect.value = oldGender;
+}
+
+function setupVoiceFilters() {
+  ["voiceCountrySelect", "voiceLanguageSelect", "voiceGenderSelect"].forEach(id => {
+    const el = $(id);
+    if (el) {
+      el.addEventListener("change", () => {
+        renderVoiceSearchResults();
+      });
+    }
+  });
+}
+
+function renderVoiceSearchResults() {
+  const input = document.getElementById("voiceSearch");
+  const box = document.getElementById("voiceSearchResultsBox");
+  const count = document.getElementById("voiceResultCount");
+
+  if (!box) return;
+
+  const query = input ? input.value.trim().toLowerCase() : "";
+
+  if (count) count.textContent = "";
+
+  if (!query) {
+    box.innerHTML = "";
+    box.style.display = "none";
+    renderRecentVoices();
+    return;
+  }
+
+  const esc = x => String(x ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[ch]));
+
+  const matches = voices.filter(v => voiceText(v).includes(query));
+  const select = document.getElementById("voiceSelect");
+  const selectedId = select ? String(select.value || "") : "";
+
+  if (!matches.length) {
+    box.innerHTML = '<div class="voice-no-results">No voices found</div>';
+    box.style.display = "";
+    return;
+  }
+
+  box.innerHTML = matches.map(v => {
+    const id = String(v.id || "");
+    const title = v.title || v.name || v.nickname || "Voice";
+
+    const lang = voiceLanguage(v);
+    const country = voiceCountry(v);
+    const gender = voiceGender(v);
+
+    const tags = [];
+    if (lang) tags.push(lang);
+    if (country) tags.push(country);
+    if (gender) tags.push(gender);
+
+    const tagsHtml = tags.slice(0, 4)
+      .map(x => `<span class="voice-card-tag">${esc(x)}</span>`)
+      .join("");
+
+    const selected = id === selectedId;
+
+    return `
+      <div class="voice-card ${selected ? "voice-is-selected" : ""}" data-voice-id="${esc(id)}">
+
+        <button
+          type="button"
+          class="voice-card-main"
+          data-voice-select="${esc(id)}"
+          aria-label="Select ${esc(title)}"
+        >
+          <span class="voice-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none">
+              <rect x="17" y="6" width="14" height="24" rx="7"
+                stroke="currentColor" stroke-width="2.4"/>
+              <path d="M10 23v2c0 7.7 6.3 14 14 14s14-6.3 14-14v-2"
+                stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+              <path d="M24 39v5M18 44h12"
+                stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+
+          <span class="voice-card-body">
+            <span class="voice-card-name">${esc(title)}</span>
+            <span class="voice-card-tags">${tagsHtml}</span>
+          </span>
+        </button>
+
+        <div class="voice-card-actions">
+
+          <button
+            type="button"
+            class="voice-card-preview"
+            data-voice-preview="${esc(id)}"
+            aria-label="Preview ${esc(title)}"
+            title="Preview"
+          >
+            <svg class="preview-play-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <circle cx="24" cy="24" r="18"
+                stroke="currentColor" stroke-width="2.4"/>
+              <path d="M20 16.5v15l12-7.5-12-7.5Z"
+                fill="currentColor"/>
+            </svg>
+            <svg class="preview-loading-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <circle cx="24" cy="24" r="17"
+                stroke="currentColor" stroke-width="3"
+                stroke-linecap="round"
+                stroke-dasharray="70 40"/>
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            class="voice-card-save"
+            data-voice-save="${esc(id)}"
+            aria-label="Save ${esc(title)}"
+            title="Save voice"
+          >
+            <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <path d="M12 8h24a3 3 0 0 1 3 3v28l-15-7-15 7V11a3 3 0 0 1 3-3Z"
+                stroke="currentColor" stroke-width="2.5"
+                stroke-linejoin="round"/>
+            </svg>
+          </button>
+
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  box.style.display = "";
+
+  // SAVE
+  box.querySelectorAll("[data-voice-save]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const id = btn.getAttribute("data-voice-save");
+      if (!id) return;
+
+      const voice = voices.find(v => String(v.id) === String(id));
+      if (!voice) return;
+
+      rememberRecentVoice(id);
+      localStorage.setItem("fish.voiceId", id);
+
+      btn.classList.add("saved");
+      btn.innerHTML = `
+        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <path d="m12 25 8 8 16-18"
+            stroke="currentColor" stroke-width="3.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+
+      renderRecentVoices();
+
+      setTimeout(() => {
+        if (!btn.isConnected) return;
+        btn.classList.remove("saved");
+        btn.innerHTML = `
+          <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M12 8h24a3 3 0 0 1 3 3v28l-15-7-15 7V11a3 3 0 0 1 3-3Z"
+              stroke="currentColor" stroke-width="2.5"
+              stroke-linejoin="round"/>
+          </svg>
+        `;
+      }, 1000);
+    });
+  });
+
+  // PREVIEW
+  box.querySelectorAll("[data-voice-preview]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const id = btn.getAttribute("data-voice-preview");
+      const voice = voices.find(v => String(v.id) === String(id));
+
+      if (voice) {
+        previewVoice(voice, btn);
+      }
+    });
+  });
+
+  // SELECT
+  box.querySelectorAll("[data-voice-select]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+
+      const id = btn.getAttribute("data-voice-select");
+      if (!id) return;
+
+      const v = voices.find(x => String(x.id) === String(id));
+      const select = document.getElementById("voiceSelect");
+
+      if (select) {
+        let option = [...select.options].find(
+          o => String(o.value) === String(id)
+        );
+
+        if (!option && v) {
+          option = new Option(
+            v.title || v.name || v.nickname || "Voice",
+            id
+          );
+          select.add(option);
+        }
+
+        select.value = id;
+        localStorage.setItem("fish.voiceId", id);
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      rememberRecentVoice(id);
+      renderRecentVoices();
+      renderVoiceSearchResults();
+    });
+  });
+}
+
+async function previewVoice(voice, button) {
+  if (!voice || !voice.id || !button) return;
+
+  const name =
+    voice.title ||
+    voice.name ||
+    voice.nickname ||
+    "Voice";
+
+  // Fish Audio uses the voice itself to determine the voice/language.
+  // We only send the actual voice name as preview text.
+  const text = name;
+
+  if (button.dataset.previewBusy === "1") return;
+
+  button.dataset.previewBusy = "1";
+  button.disabled = true;
+  button.classList.add("is-playing");
+
+  try {
+    const response = await fetch(`${API}/api/tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        text,
+        voiceId: voice.id,
+        emotion: "neutral"
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Preview failed");
+    }
+
+    const jobId = data.jobId || data.id;
+
+    if (!jobId) {
+      throw new Error("No preview job");
+    }
+
+    let audioUrl = data.audioUrl || "";
+
+    for (let i = 0; i < 180; i++) {
+      await new Promise(resolve => setTimeout(resolve, 350));
+
+      const r = await fetch(
+        `${API}/api/tts-progress/${encodeURIComponent(jobId)}`,
+        { cache: "no-store" }
+      );
+
+      if (!r.ok) continue;
+
+      const p = await r.json();
+
+      if (p.failed) {
+        throw new Error(p.error || "Preview failed");
+      }
+
+      if (p.audioUrl) {
+        audioUrl = p.audioUrl;
+      }
+
+      if (p.finished) {
+        break;
+      }
+    }
+
+    if (!audioUrl) {
+      audioUrl = `${API}/api/audio/${encodeURIComponent(jobId)}`;
+    }
+
+    const audio = new Audio(audioUrl);
+    audio.preload = "auto";
+
+    await audio.play();
+
+    audio.addEventListener("ended", () => {
+      button.disabled = false;
+      button.dataset.previewBusy = "0";
+      button.classList.remove("is-playing");
+    }, { once: true });
+
+    audio.addEventListener("error", () => {
+      button.disabled = false;
+      button.dataset.previewBusy = "0";
+      button.classList.remove("is-playing");
+    }, { once: true });
+
+  } catch (err) {
+    console.error("Voice preview:", err);
+
+    button.disabled = false;
+    button.dataset.previewBusy = "0";
+    button.classList.remove("is-playing");
+  }
+}
+
+
+function selectVoiceFromLibrary(id) {
+  const voice = voices.find(v => String(v.id) === String(id));
+  if (!voice) return;
+
+  const select = document.getElementById("voiceSelect");
+
+  if (select) {
+    let option = [...select.options]
+      .find(o => String(o.value) === String(id));
+
+    if (!option) {
+      option = new Option(
+        voice.title ||
+        voice.name ||
+        voice.nickname ||
+        voice.display_name ||
+        "Voice",
+        voice.id
+      );
+
+      select.add(option);
+    }
+
+    select.value = voice.id;
+    localStorage.setItem("fish.voiceId", voice.id);
+
+    select.dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+  }
+
+  rememberRecentVoice(id);
+
+  document
+    .querySelectorAll(".voice-card.voice-is-selected")
+    .forEach(x => x.classList.remove("voice-is-selected"));
+
+  const card = document.querySelector(
+    `.voice-card[data-voice-id="${CSS.escape(String(id))}"]`
+  );
+
+  if (card) {
+    card.classList.add("voice-is-selected");
+  }
+
+  renderRecentVoices();
+}
+
+async function previewVoice(voice) {
+  if (!voice || !voice.id) return;
+
+  const name =
+    voice.title ||
+    voice.name ||
+    voice.nickname ||
+    "Voice";
+
+  const rawLang =
+    voice.language ||
+    voice.lang ||
+    voice.locale ||
+    voice.language_code ||
+    voice.languageCode ||
+    "";
+
+  const lang = String(rawLang).toLowerCase();
+
+  // Use the voice's own language for the preview.
+  let previewText = name;
+  let previewLanguage = "en";
+
+  if (lang.includes("ar") || lang.includes("arab")) {
+    previewLanguage = "ar";
+  } else if (lang.includes("fr") || lang.includes("french")) {
+    previewLanguage = "fr";
+  } else if (lang.includes("es") || lang.includes("spanish")) {
+    previewLanguage = "es";
+  } else if (lang.includes("de") || lang.includes("german")) {
+    previewLanguage = "de";
+  } else if (lang.includes("it") || lang.includes("italian")) {
+    previewLanguage = "it";
+  } else if (lang.includes("pt") || lang.includes("portugu")) {
+    previewLanguage = "pt";
+  } else if (lang.includes("tr") || lang.includes("turk")) {
+    previewLanguage = "tr";
+  } else if (lang.includes("nl") || lang.includes("dutch")) {
+    previewLanguage = "nl";
+  } else if (lang.includes("ja") || lang.includes("japan")) {
+    previewLanguage = "ja";
+  } else if (lang.includes("ko") || lang.includes("korean")) {
+    previewLanguage = "ko";
+  } else if (lang.includes("zh") || lang.includes("chinese")) {
+    previewLanguage = "zh";
+  }
+
+  const buttons = document.querySelectorAll(".voice-card-preview");
+  buttons.forEach(b => {
+    b.disabled = true;
+    b.classList.add("is-playing");
+  });
+
+  try {
+    const response = await fetch(`${API}/api/tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: previewText,
+        voiceId: voice.id,
+        emotion: "neutral",
+        preview: true,
+        language: previewLanguage
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error("Preview request failed");
+    }
+
+    const data = await response.json();
+    const jobId = data.jobId || data.id || data.job?.id;
+
+    if (!jobId) {
+      throw new Error("No preview job id");
+    }
+
+    let audioUrl =
+      data.audioUrl ||
+      data.url ||
+      data.audio ||
+      `/api/audio/${encodeURIComponent(jobId)}`;
+
+    let done = false;
+
+    for (let i = 0; i < 180 && !done; i++) {
+      await new Promise(r => setTimeout(r, 350));
+
+      const r = await fetch(
+        `${API}/api/tts-progress/${encodeURIComponent(jobId)}`
+      );
+
+      if (!r.ok) continue;
+
+      const progress = await r.json();
+
+      if (
+        progress.audioUrl ||
+        progress.url ||
+        progress.audio
+      ) {
+        audioUrl =
+          progress.audioUrl ||
+          progress.url ||
+          progress.audio;
+      }
+
+      const status = String(
+        progress.status ||
+        progress.state ||
+        ""
+      ).toLowerCase();
+
+      if (
+        status === "completed" ||
+        status === "complete" ||
+        status === "done" ||
+        progress.completed === true
+      ) {
+        done = true;
+      }
+
+      if (
+        status === "failed" ||
+        status === "error"
+      ) {
+        throw new Error("Preview failed");
+      }
+    }
+
+    if (!done) {
+      throw new Error("Preview timeout");
+    }
+
+    const audio = new Audio(audioUrl);
+    audio.preload = "auto";
+
+    audio.onended = () => {
+      buttons.forEach(b => {
+        b.disabled = false;
+        b.classList.remove("is-playing");
+      });
+    };
+
+    await audio.play();
+
+  } catch (err) {
+    console.error("Voice preview error:", err);
+
+    buttons.forEach(b => {
+      b.disabled = false;
+      b.classList.remove("is-playing");
+    });
+  }
+}
+function getRecentVoices() {
+  try {
+    const data = JSON.parse(localStorage.getItem(RECENT_VOICES_KEY) || "[]");
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberRecentVoice(id) {
+  if (!id) return;
+
+  const voice = voices.find(v => v.id === id);
+  if (!voice) return;
+
+  const item = {
+    ...voice,
+    id: voice.id,
+    title: voice.title || voice.name || voice.nickname || "Voice"
+  };
+
+  let recent = getRecentVoices();
+
+  recent = recent.filter(v => v.id !== item.id);
+  recent.unshift(item);
+  recent = recent.slice(0, RECENT_VOICES_MAX);
+
+  localStorage.setItem(RECENT_VOICES_KEY, JSON.stringify(recent));
+}
+
+
+
+function renderRecentVoices() {
+  const box = document.getElementById("recentVoicesBox");
+  if (!box) return;
+
+  const recent = getRecentVoices()
+    .filter(v => v && v.id);
+
+  if (!recent.length) {
+    box.innerHTML = "";
+    box.style.display = "none";
+    return;
+  }
+
+  const esc = x => String(x ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[ch]));
+
+  box.innerHTML = `
+    <div class="recent-voices-title">آخر الأصوات المحفوظة</div>
+
+    <div class="recent-voices-list">
+      ${recent.map(v => `
+        <div class="recent-voice-item">
+          <button
+            type="button"
+            class="recent-voice-main"
+            data-recent-select="${esc(v.id)}"
+          >
+            <span class="recent-voice-icon" aria-hidden="true">
+  <svg viewBox="0 0 48 48" fill="none">
+    <path d="M24 7.5c-4.1 0-7.4 3.3-7.4 7.4v10.2c0 4.1 3.3 7.4 7.4 7.4s7.4-3.3 7.4-7.4V14.9c0-4.1-3.3-7.4-7.4-7.4Z"
+      stroke="currentColor" stroke-width="2.4"
+      stroke-linejoin="round"/>
+
+    <path d="M11.5 23.2v1.9c0 6.9 5.6 12.5 12.5 12.5s12.5-5.6 12.5-12.5v-1.9"
+      stroke="currentColor" stroke-width="2.4"
+      stroke-linecap="round"/>
+
+    <path d="M24 37.6v6"
+      stroke="currentColor" stroke-width="2.4"
+      stroke-linecap="round"/>
+
+    <path d="M18.2 43.6h11.6"
+      stroke="currentColor" stroke-width="2.4"
+      stroke-linecap="round"/>
+
+    <path d="M9 18.2c-1.1 1.7-1.7 3.7-1.7 5.9M39 18.2c1.1 1.7 1.7 3.7 1.7 5.9"
+      stroke="currentColor" stroke-width="1.5"
+      stroke-linecap="round"
+      opacity=".55"/>
+  </svg>
+</span>
+
+            <span class="recent-voice-name">
+              ${esc(v.title || v.name || v.nickname || "Voice")}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            class="recent-voice-delete"
+            data-recent-delete="${esc(v.id)}"
+            aria-label="حذف الصوت"
+          >×</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  box.style.display = "block";
+
+  box.querySelectorAll("[data-recent-select]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-recent-select");
+
+      const saved = getRecentVoices()
+        .find(v => String(v.id) === String(id));
+
+      if (!saved) return;
+
+      const select = document.getElementById("voiceSelect");
+
+      if (select) {
+        let option = [...select.options]
+          .find(o => String(o.value) === String(id));
+
+        if (!option) {
+          option = new Option(
+            saved.title || saved.name || saved.nickname || "Voice",
+            saved.id
+          );
+          select.add(option);
+        }
+
+        select.value = saved.id;
+        localStorage.setItem("fish.voiceId", saved.id);
+        select.dispatchEvent(
+          new Event("change", { bubbles: true })
+        );
+      }
+    });
+  });
+
+  box.querySelectorAll("[data-recent-delete]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const id = btn.getAttribute("data-recent-delete");
+
+      const updated = getRecentVoices()
+        .filter(v => String(v.id) !== String(id));
+
+      localStorage.setItem(
+        RECENT_VOICES_KEY,
+        JSON.stringify(updated)
+      );
+
+      renderRecentVoices();
+    });
+  });
+}
+
+function showVoiceInfo() {
+  const box = document.getElementById("voiceInfo");
+  if (box) box.innerHTML = "";
+}
+
+function updateCounter() {
+  const n = $("textInput").value.length;
+  $("charCount").textContent =
+    `${n.toLocaleString()} / 50,000 characters`;
+
+  if (n > 8000) {
+    const chunks = Math.ceil(n / 900);
+    $("chunkInfo").textContent =
+      `⚡ ~${chunks} chunks × ~900 chars • 10 parallel`;
+  } else {
+    $("chunkInfo").textContent =
+      "⚡ Single request";
+  }
+}
+
+async function generateSpeech() {
+  const text = $("textInput").value.trim();
+  const voiceId = $("voiceSelect").value;
+  const ttsText = cinematicMode ? prepareCinematicText(text) : text;
+
+  if (!text) {
+    showStatus("⚠️ كتب النص أولاً", "error");
+    return;
+  }
+
+  if (!voiceId) {
+    showStatus("⚠️ اختار Voice أولاً", "error");
+    return;
+  }
+
+  if (text.length > 50000) {
+    showStatus("⚠️ الحد الأقصى هو 50,000 حرف", "error");
+    return;
+  }
+
+  localStorage.setItem("fish.voiceId", voiceId);
+  localStorage.setItem("fish.emotion", selectedEmotion);
+  rememberRecentVoice(voiceId);
+  renderRecentVoices();
+  localStorage.setItem("fish.text", text);
+
+  const active = localStorage.getItem("fish.activeJobId");
+
+  if (active) {
+    try {
+      const r = await fetch(`${API}/api/tts-progress/${active}`, {
+        cache: "no-store"
+      });
+      if (r.ok) {
+        const old = await r.json();
+        if (!old.finished && !old.failed) {
+          startJobWatcher(active);
+          return;
+        }
+      }
+    } catch (_) {}
+  }
+
+  const jobId =
+    (crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+  localStorage.setItem("fish.activeJobId", jobId);
+
+  startJobWatcher(jobId);
+
+  try {
+    const response = await fetch(`${API}/api/tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-TTS-Job-Id": jobId
+      },
+      body: JSON.stringify({
+        text,
+        voiceId,
+        emotion: selectedEmotion
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "TTS request failed");
+    }
+
+    if (data.jobId && data.jobId !== jobId) {
+      localStorage.setItem("fish.activeJobId", data.jobId);
+      startJobWatcher(data.jobId);
+    }
+
+  } catch (error) {
+    stopJobWatcher();
+    localStorage.removeItem("fish.activeJobId");
+    showStatus("❌ " + error.message, "error");
+    $("generateBtn").disabled = false;
+    $("generateBtn").textContent = "🎙️ Generate Speech";
+  }
+}
+
+function stopJobWatcher() {
+  clearInterval(generationCountdownTimer);
+  clearInterval(generationPoller);
+  generationCountdownTimer = null;
+  generationPoller = null;
+}
+
+function startJobWatcher(jobId) {
+  stopJobWatcher();
+
+  $("progressBox").classList.remove("hidden");
+  $("audioSection").classList.add("hidden");
+
+  const btn = $("generateBtn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Generating...";
+
+  let estimatedTotalSeconds = 120;
+  let finished = false;
+
+  const update = async () => {
+    if (finished) return;
+
+    try {
+      const r = await fetch(
+        `${API}/api/tts-progress/${encodeURIComponent(jobId)}`,
+        { cache: "no-store" }
+      );
+
+      if (!r.ok) return;
+
+      const p = await r.json();
+
+      const started =
+        Number(p.startedAt) || Date.now();
+
+      const elapsed =
+        Math.floor((Date.now() - started) / 1000);
+
+      $("elapsedTime").textContent =
+        `${elapsed}s`;
+
+      if (
+        p.eta !== null &&
+        Number.isFinite(Number(p.eta))
+      ) {
+        estimatedTotalSeconds =
+          Math.max(
+            estimatedTotalSeconds,
+            elapsed + Number(p.eta)
+          );
+      }
+
+      const remaining =
+        p.finished
+          ? 0
+          : Math.max(
+              1,
+              Math.ceil(
+                estimatedTotalSeconds - elapsed
+              )
+            );
+
+      $("remainingTime").textContent =
+        `${remaining}s`;
+
+      if (p.failed) {
+        finished = true;
+        stopJobWatcher();
+        localStorage.removeItem("fish.activeJobId");
+        showStatus(
+          "❌ " + (p.error || "فشل إنشاء الصوت"),
+          "error"
+        );
+        btn.disabled = false;
+        btn.textContent = "🎙️ Generate Speech";
+        return;
+      }
+
+      if (p.merging) {
+        setProgress(
+          98,
+          `🔄 دمج الصوت... • ${p.completed}/${p.total}`
+        );
+      } else if (p.total > 1) {
+        const percent =
+          Math.min(
+            94,
+            8 + Math.round(
+              (Number(p.completed) / Number(p.total)) * 90
+            )
+          );
+
+        setProgress(
+          percent,
+          `🎙️ جاري التوليد... • ${p.completed}/${p.total}`
+        );
+      } else {
+        setProgress(
+          15,
+          "🎙️ جاري توليد الصوت..."
+        );
+      }
+
+      if (p.finished && p.audioUrl) {
+        finished = true;
+        stopJobWatcher();
+
+        $("elapsedTime").textContent =
+          `${Math.floor(
+            Number(p.processingSeconds || elapsed)
+          )}s`;
+
+        $("remainingTime").textContent = "0s";
+
+        setProgress(
+          100,
+          "✅ الصوت جاهز"
+        );
+
+        generatedAudioUrl =
+          p.audioUrl.startsWith("http")
+            ? p.audioUrl
+            : `${API}${p.audioUrl}`;
+
+        localStorage.setItem(
+          "fish.generatedAudioUrl",
+          generatedAudioUrl
+        );
+
+        $("audioPlayer").src = generatedAudioUrl;
+        $("audioPlayer").load();
+
+        $("audioSection").classList.remove("hidden");
+
+        btn.disabled = false;
+        btn.textContent = "🎙️ Generate Speech";
+
+        localStorage.removeItem("fish.activeJobId");
+
+        showStatus(
+          `✅ تم إنشاء الصوت في ${Number(
+            p.processingSeconds || elapsed
+          ).toFixed(1)}s`,
+          "success"
+        );
+      }
+    } catch (_) {}
+  };
+
+  update();
+  generationPoller = setInterval(update, 700);
+  generationCountdownTimer = setInterval(update, 1000);
+}
+
+async function resumeActiveJob() {
+  const jobId =
+    localStorage.getItem("fish.activeJobId");
+
+  if (!jobId) return;
+
+  $("progressBox").classList.remove("hidden");
+
+  startJobWatcher(jobId);
+
+  try {
+    const r = await fetch(
+      `${API}/api/tts-progress/${encodeURIComponent(jobId)}`,
+      { cache: "no-store" }
+    );
+
+    if (!r.ok) {
+      localStorage.removeItem("fish.activeJobId");
+      stopJobWatcher();
+      $("progressBox").classList.add("hidden");
+      $("generateBtn").disabled = false;
+      $("generateBtn").textContent = "🎙️ Generate Speech";
+    }
+  } catch (_) {}
+}
+
+function setProgress(percent, text) {
+  $("progressFill").style.width = percent + "%";
+  $("progressText").textContent = text;
+}
+
+function showStatus(message, type) {
+  const box = $("statusBox");
+  box.textContent = message;
+  box.className = "status-box " + type;
+}
+
+function downloadAudio() {
+  if (!generatedAudioUrl) {
+    generatedAudioUrl =
+      localStorage.getItem("fish.generatedAudioUrl") || "";
+  }
+
+  if (!generatedAudioUrl) {
+    showStatus("⚠️ ما كاين حتى صوت جاهز للتحميل", "error");
+    return;
+  }
+
+  const a = document.createElement("a");
+  a.href = generatedAudioUrl;
+  a.download = "fish-audio.mp3";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function copyAudioUrl() {
+  if (!generatedAudioUrl) {
+    showStatus("⚠️ ما كاين حتى صوت جاهز", "error");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(generatedAudioUrl);
+    showStatus("📋 تم نسخ رابط الصوت", "success");
+  } catch {
+    showStatus("⚠️ المتصفح منع نسخ الرابط", "error");
+  }
+}
+
+async function loadClonedVoices() { return; }
+
+function showCloneForm() {
+  $("cloneModal").classList.remove("hidden");
+}
+
+function hideCloneForm() {
+  $("cloneModal").classList.add("hidden");
+}
+
+function addAudioUrlInput() {
+  const input = document.createElement("input");
+  input.className = "input audio-url-input";
+  input.placeholder = "https://example.com/audio.wav";
+  $("audioUrlsContainer").appendChild(input);
+}
+
+async function submitVoiceClone() {
+  const title = $("voiceTitle").value.trim();
+  const audioUrls = [...document.querySelectorAll(".audio-url-input")]
+    .map(x => x.value.trim())
+    .filter(Boolean);
+
+  if (!title || !audioUrls.length) {
+    alert("دخل اسم الصوت ورابط صوت واحد على الأقل.");
+    return;
+  }
+
+  try {
+    const r = await fetch(`${API}/api/clone-voice`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({title, audioUrls})
+    });
+
+    const d = await r.json();
+
+    if (!r.ok) throw new Error(d.error || "Clone failed");
+
+    hideCloneForm();
+    await loadClonedVoices();
+
+  const savedEmotion =
+    localStorage.getItem("fish.emotion");
+
+  if (savedEmotion) {
+    selectedEmotion = savedEmotion;
+    document.querySelectorAll(".emotion").forEach(btn => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.emotion === selectedEmotion
+      );
+    });
+  }
+
+  resumeActiveJob();
+    showStatus("✅ تم إنشاء الصوت المستنسخ", "success");
+  } catch (e) {
+    showStatus("❌ " + e.message, "error");
+  }
+}
+
+/* =========================================================
+   Professional voice selection effect
+   ========================================================= */
+(function setupProfessionalVoiceSelection() {
+
+  function clearSelected() {
+    document
+      .querySelectorAll(
+        ".voice-card.voice-is-selected, .recent-voice-item.voice-is-selected"
+      )
+      .forEach(el => el.classList.remove("voice-is-selected"));
+  }
+
+  function markSelected(el) {
+    if (!el) return;
+
+    clearSelected();
+
+    const card = el.closest(".voice-card, .recent-voice-item");
+
+    if (card) {
+      card.classList.add("voice-is-selected");
+
+      setTimeout(() => {
+        card.classList.add("voice-is-selected");
+      }, 20);
+    }
+  }
+
+  document.addEventListener("click", event => {
+
+    const card = event.target.closest(
+      ".voice-card, .recent-voice-main, .recent-voice-item"
+    );
+
+    if (!card) return;
+
+    /* ما نطبقوش التأثير على زر الحذف */
+    if (
+      event.target.closest(".recent-voice-delete") ||
+      event.target.closest(".voice-card-save")
+    ) {
+      return;
+    }
+
+    markSelected(card);
+  });
+
+  /* إذا كان صوت محفوظ بالفعل مختار */
+  const savedId = localStorage.getItem("fish.voiceId");
+
+  if (savedId) {
+    setTimeout(() => {
+      const cards = document.querySelectorAll(
+        ".voice-card, .recent-voice-item"
+      );
+
+      cards.forEach(card => {
+        const id =
+          card.dataset.voiceId ||
+          card.querySelector("[data-voice-id]")?.dataset.voiceId ||
+          card.querySelector("[data-recent-select]")?.dataset.recentSelect;
+
+        if (id && String(id) === String(savedId)) {
+          card.classList.add("voice-is-selected");
+        }
+      });
+    }, 100);
+  }
+
+})();
+
+
+/* =========================================================
+   Professional voice selection effect
+   ========================================================= */
+(function setupProfessionalVoiceSelection() {
+
+  function clearSelected() {
+    document
+      .querySelectorAll(
+        ".voice-card.voice-is-selected, .recent-voice-item.voice-is-selected"
+      )
+      .forEach(el => el.classList.remove("voice-is-selected"));
+  }
+
+  function markSelected(el) {
+    if (!el) return;
+
+    clearSelected();
+
+    const card = el.closest(".voice-card, .recent-voice-item");
+
+    if (card) {
+      card.classList.add("voice-is-selected");
+
+      setTimeout(() => {
+        card.classList.add("voice-is-selected");
+      }, 20);
+    }
+  }
+
+  document.addEventListener("click", event => {
+
+    const card = event.target.closest(
+      ".voice-card, .recent-voice-main, .recent-voice-item"
+    );
+
+    if (!card) return;
+
+    /* ما نطبقوش التأثير على زر الحذف */
+    if (
+      event.target.closest(".recent-voice-delete") ||
+      event.target.closest(".voice-card-save")
+    ) {
+      return;
+    }
+
+    markSelected(card);
+  });
+
+  /* إذا كان صوت محفوظ بالفعل مختار */
+  const savedId = localStorage.getItem("fish.voiceId");
+
+  if (savedId) {
+    setTimeout(() => {
+      const cards = document.querySelectorAll(
+        ".voice-card, .recent-voice-item"
+      );
+
+      cards.forEach(card => {
+        const id =
+          card.dataset.voiceId ||
+          card.querySelector("[data-voice-id]")?.dataset.voiceId ||
+          card.querySelector("[data-recent-select]")?.dataset.recentSelect;
+
+        if (id && String(id) === String(savedId)) {
+          card.classList.add("voice-is-selected");
+        }
+      });
+    }, 100);
+  }
+
+})();
+

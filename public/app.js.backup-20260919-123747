@@ -1,0 +1,590 @@
+const API = location.origin;
+let voices = [];
+let page = 1;
+const pageSize = 50;
+let hasMore = true;
+let selectedEmotion = "neutral";
+let generatedAudioUrl = "";
+let searchTimer = null;
+let generationPoller = null;
+let generationCountdownTimer = null;
+let generationRemaining = 120;
+
+const $ = id => document.getElementById(id);
+
+document.addEventListener("DOMContentLoaded", () => {
+  updateCounter();
+  setupEvents();
+  checkHealth();
+  loadVoices(true);
+
+  const savedVoiceSearch = localStorage.getItem(VOICE_SEARCH_KEY);
+  if (savedVoiceSearch) {
+    const searchInput =
+      document.querySelector("#voiceSearch") ||
+      document.querySelector("#searchVoice") ||
+      document.querySelector('input[type="search"]');
+
+    if (searchInput) {
+      searchInput.value = savedVoiceSearch;
+      searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+  loadClonedVoices();
+
+  const savedEmotion =
+    localStorage.getItem("fish.emotion");
+
+  if (savedEmotion) {
+    selectedEmotion = savedEmotion;
+    document.querySelectorAll(".emotion").forEach(btn => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.emotion === selectedEmotion
+      );
+    });
+  }
+
+  resumeActiveJob();
+});
+
+function setupEvents() {
+  $("textInput").addEventListener("input", updateCounter);
+
+  document.querySelectorAll(".emotion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".emotion").forEach(x => x.classList.remove("active"));
+      btn.classList.add("active");
+      selectedEmotion = btn.dataset.emotion;
+    });
+  });
+
+  $("voiceSearch").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadVoices(true), 300);
+  });
+
+  $("languageSelect").addEventListener("change", () => loadVoices(true));
+  $("loadMoreBtn").addEventListener("click", () => loadVoices(false));
+  $("refreshBtn").addEventListener("click", () => loadVoices(true));
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/api/health`);
+    const d = await r.json();
+
+    $("healthStatus").textContent = d.fishConfigured
+      ? "Voice Studio connected"
+      : "🔴 Voice Studio API key missing";
+
+    $("healthStatus").className = d.fishConfigured
+      ? "status ok"
+      : "status error";
+  } catch {
+    $("healthStatus").textContent = "🔴 Server unavailable";
+    $("healthStatus").className = "status error";
+  }
+}
+
+async function loadVoices(reset = false) {
+  const search = $("voiceSearch").value.trim();
+  const language = $("languageSelect").value;
+
+  if (reset) {
+    page = 1;
+    hasMore = true;
+    voices = [];
+    $("voiceSelect").innerHTML = `<option value="">Loading voices...</option>`;
+  }
+
+  if (!hasMore && !reset) return;
+
+  $("loadMoreBtn").disabled = true;
+  $("loadMoreBtn").textContent = "⏳ Loading...";
+
+  try {
+    const params = new URLSearchParams({
+      page: page,
+      pageSize: pageSize
+    });
+
+    if (search) params.set("search", search);
+    if (language) params.set("language", language);
+
+    const r = await fetch(`${API}/api/voices?${params}`);
+    if (!r.ok) throw new Error("Voice request failed");
+
+    const data = await r.json();
+    const items = data.voices || data.models || data.items || [];
+
+    if (reset) voices = [];
+
+    const existing = new Set(voices.map(v => v.id));
+    for (const v of items) {
+      if (v.id && !existing.has(v.id)) voices.push(v);
+    }
+
+    hasMore = Boolean(data.hasMore) || items.length >= pageSize;
+    page++;
+
+    renderVoices();
+
+    $("voiceStatus").textContent =
+      `✅ تم تحميل النتائج (${voices.length})`;
+  } catch (e) {
+    $("voiceStatus").textContent = "❌ تعذر تحميل الأصوات: " + e.message;
+  } finally {
+    $("loadMoreBtn").disabled = !hasMore;
+    $("loadMoreBtn").textContent =
+      hasMore ? "⬇️ Load More Voices" : "✅ All loaded";
+  }
+}
+
+function renderVoices() {
+  const select = $("voiceSelect");
+  const previous = select.value;
+
+  select.innerHTML = "";
+
+  if (!voices.length) {
+    select.innerHTML = `<option value="">No voices found</option>`;
+    $("voiceInfo").textContent = "";
+    return;
+  }
+
+  voices.forEach((v, i) => {
+    const option = document.createElement("option");
+    option.value = v.id || "";
+    option.textContent =
+      v.title ||
+      v.name ||
+      `Voice ${i + 1}`;
+    select.appendChild(option);
+  });
+
+  const savedVoice = localStorage.getItem("fish.voiceId");
+
+  if (savedVoice && voices.some(v => v.id === savedVoice)) {
+    select.value = savedVoice;
+  } else if (voices.some(v => v.id === previous)) {
+    select.value = previous;
+  }
+
+  showVoiceInfo();
+  select.onchange = () => {
+    showVoiceInfo();
+    if (select.value) {
+      localStorage.setItem("fish.voiceId", select.value);
+    }
+  };
+}
+
+function showVoiceInfo() {
+  const v = voices.find(x => x.id === $("voiceSelect").value);
+  if (!v) {
+    $("voiceInfo").textContent = "";
+    return;
+  }
+
+  const title = v.title || v.name || "";
+  const lang = v.language || "";
+  const desc = v.description || "";
+  const tags = Array.isArray(v.tags) ? v.tags.join(", ") : "";
+
+  $("voiceInfo").textContent =
+    [title, lang, tags, desc].filter(Boolean).join(" • ");
+}
+
+function updateCounter() {
+  const n = $("textInput").value.length;
+  $("charCount").textContent =
+    `${n.toLocaleString()} / 50,000 characters`;
+
+  if (n > 8000) {
+    const chunks = Math.ceil(n / 900);
+    $("chunkInfo").textContent =
+      `⚡ ~${chunks} chunks × ~900 chars • 10 parallel`;
+  } else {
+    $("chunkInfo").textContent =
+      "⚡ Single request";
+  }
+}
+
+async function generateSpeech() {
+  const text = $("textInput").value.trim();
+  const voiceId = $("voiceSelect").value;
+
+  if (!text) {
+    showStatus("⚠️ كتب النص أولاً", "error");
+    return;
+  }
+
+  if (!voiceId) {
+    showStatus("⚠️ اختار Voice أولاً", "error");
+    return;
+  }
+
+  if (text.length > 50000) {
+    showStatus("⚠️ الحد الأقصى هو 50,000 حرف", "error");
+    return;
+  }
+
+  localStorage.setItem("fish.voiceId", voiceId);
+  localStorage.setItem("fish.emotion", selectedEmotion);
+  localStorage.setItem("fish.text", text);
+
+  const active = localStorage.getItem("fish.activeJobId");
+
+  if (active) {
+    try {
+      const r = await fetch(`${API}/api/tts-progress/${active}`, {
+        cache: "no-store"
+      });
+      if (r.ok) {
+        const old = await r.json();
+        if (!old.finished && !old.failed) {
+          startJobWatcher(active);
+          return;
+        }
+      }
+    } catch (_) {}
+  }
+
+  const jobId =
+    (crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+  localStorage.setItem("fish.activeJobId", jobId);
+
+  startJobWatcher(jobId);
+
+  try {
+    const response = await fetch(`${API}/api/tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-TTS-Job-Id": jobId
+      },
+      body: JSON.stringify({
+        text,
+        voiceId,
+        emotion: selectedEmotion
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "TTS request failed");
+    }
+
+    if (data.jobId && data.jobId !== jobId) {
+      localStorage.setItem("fish.activeJobId", data.jobId);
+      startJobWatcher(data.jobId);
+    }
+
+  } catch (error) {
+    stopJobWatcher();
+    localStorage.removeItem("fish.activeJobId");
+    showStatus("❌ " + error.message, "error");
+    $("generateBtn").disabled = false;
+    $("generateBtn").textContent = "🎙️ Generate Speech";
+  }
+}
+
+function stopJobWatcher() {
+  clearInterval(generationCountdownTimer);
+  clearInterval(generationPoller);
+  generationCountdownTimer = null;
+  generationPoller = null;
+}
+
+function startJobWatcher(jobId) {
+  stopJobWatcher();
+
+  $("progressBox").classList.remove("hidden");
+  $("audioSection").classList.add("hidden");
+
+  const btn = $("generateBtn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Generating...";
+
+  let estimatedTotalSeconds = 120;
+  let finished = false;
+
+  const update = async () => {
+    if (finished) return;
+
+    try {
+      const r = await fetch(
+        `${API}/api/tts-progress/${encodeURIComponent(jobId)}`,
+        { cache: "no-store" }
+      );
+
+      if (!r.ok) return;
+
+      const p = await r.json();
+
+      const started =
+        Number(p.startedAt) || Date.now();
+
+      const elapsed =
+        Math.floor((Date.now() - started) / 1000);
+
+      $("elapsedTime").textContent =
+        `${elapsed}s`;
+
+      if (
+        p.eta !== null &&
+        Number.isFinite(Number(p.eta))
+      ) {
+        estimatedTotalSeconds =
+          Math.max(
+            estimatedTotalSeconds,
+            elapsed + Number(p.eta)
+          );
+      }
+
+      const remaining =
+        p.finished
+          ? 0
+          : Math.max(
+              1,
+              Math.ceil(
+                estimatedTotalSeconds - elapsed
+              )
+            );
+
+      $("remainingTime").textContent =
+        `${remaining}s`;
+
+      if (p.failed) {
+        finished = true;
+        stopJobWatcher();
+        localStorage.removeItem("fish.activeJobId");
+        showStatus(
+          "❌ " + (p.error || "فشل إنشاء الصوت"),
+          "error"
+        );
+        btn.disabled = false;
+        btn.textContent = "🎙️ Generate Speech";
+        return;
+      }
+
+      if (p.merging) {
+        setProgress(
+          98,
+          `🔄 دمج الصوت... • ${p.completed}/${p.total}`
+        );
+      } else if (p.total > 1) {
+        const percent =
+          Math.min(
+            94,
+            8 + Math.round(
+              (Number(p.completed) / Number(p.total)) * 90
+            )
+          );
+
+        setProgress(
+          percent,
+          `🎙️ جاري التوليد... • ${p.completed}/${p.total}`
+        );
+      } else {
+        setProgress(
+          15,
+          "🎙️ جاري توليد الصوت..."
+        );
+      }
+
+      if (p.finished && p.audioUrl) {
+        finished = true;
+        stopJobWatcher();
+
+        $("elapsedTime").textContent =
+          `${Math.floor(
+            Number(p.processingSeconds || elapsed)
+          )}s`;
+
+        $("remainingTime").textContent = "0s";
+
+        setProgress(
+          100,
+          "✅ الصوت جاهز"
+        );
+
+        $("audioPlayer").src =
+          `${API}${p.audioUrl}`;
+
+        $("audioSection").classList.remove("hidden");
+
+        btn.disabled = false;
+        btn.textContent = "🎙️ Generate Speech";
+
+        localStorage.removeItem("fish.activeJobId");
+
+        showStatus(
+          `✅ تم إنشاء الصوت في ${Number(
+            p.processingSeconds || elapsed
+          ).toFixed(1)}s`,
+          "success"
+        );
+      }
+    } catch (_) {}
+  };
+
+  update();
+  generationPoller = setInterval(update, 700);
+  generationCountdownTimer = setInterval(update, 1000);
+}
+
+async function resumeActiveJob() {
+  const jobId =
+    localStorage.getItem("fish.activeJobId");
+
+  if (!jobId) return;
+
+  $("progressBox").classList.remove("hidden");
+
+  startJobWatcher(jobId);
+
+  try {
+    const r = await fetch(
+      `${API}/api/tts-progress/${encodeURIComponent(jobId)}`,
+      { cache: "no-store" }
+    );
+
+    if (!r.ok) {
+      localStorage.removeItem("fish.activeJobId");
+      stopJobWatcher();
+      $("progressBox").classList.add("hidden");
+      $("generateBtn").disabled = false;
+      $("generateBtn").textContent = "🎙️ Generate Speech";
+    }
+  } catch (_) {}
+}
+
+function setProgress(percent, text) {
+  $("progressFill").style.width = percent + "%";
+  $("progressText").textContent = text;
+}
+
+function showStatus(message, type) {
+  const box = $("statusBox");
+  box.textContent = message;
+  box.className = "status-box " + type;
+}
+
+function downloadAudio() {
+  if (!generatedAudioUrl) {
+    showStatus("⚠️ ما كاين حتى صوت جاهز للتحميل", "error");
+    return;
+  }
+
+  const a = document.createElement("a");
+  a.href = generatedAudioUrl;
+  a.download = "fish-audio.mp3";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function copyAudioUrl() {
+  if (!generatedAudioUrl) {
+    showStatus("⚠️ ما كاين حتى صوت جاهز", "error");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(generatedAudioUrl);
+    showStatus("📋 تم نسخ رابط الصوت", "success");
+  } catch {
+    showStatus("⚠️ المتصفح منع نسخ الرابط", "error");
+  }
+}
+
+async function loadClonedVoices() {
+  try {
+    const r = await fetch(`${API}/api/my-voices`);
+    if (!r.ok) return;
+
+    const data = await r.json();
+    const items = data.voices || [];
+
+    const select = $("clonedVoiceSelect");
+    select.innerHTML = "";
+
+    if (!items.length) {
+      select.innerHTML = `<option value="">No cloned voices yet</option>`;
+      return;
+    }
+
+    items.forEach(v => {
+      const o = document.createElement("option");
+      o.value = v.id || "";
+      o.textContent = v.title || v.name || v.id;
+      select.appendChild(o);
+    });
+  } catch {}
+}
+
+function showCloneForm() {
+  $("cloneModal").classList.remove("hidden");
+}
+
+function hideCloneForm() {
+  $("cloneModal").classList.add("hidden");
+}
+
+function addAudioUrlInput() {
+  const input = document.createElement("input");
+  input.className = "input audio-url-input";
+  input.placeholder = "https://example.com/audio.wav";
+  $("audioUrlsContainer").appendChild(input);
+}
+
+async function submitVoiceClone() {
+  const title = $("voiceTitle").value.trim();
+  const audioUrls = [...document.querySelectorAll(".audio-url-input")]
+    .map(x => x.value.trim())
+    .filter(Boolean);
+
+  if (!title || !audioUrls.length) {
+    alert("دخل اسم الصوت ورابط صوت واحد على الأقل.");
+    return;
+  }
+
+  try {
+    const r = await fetch(`${API}/api/clone-voice`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({title, audioUrls})
+    });
+
+    const d = await r.json();
+
+    if (!r.ok) throw new Error(d.error || "Clone failed");
+
+    hideCloneForm();
+    await loadClonedVoices();
+
+  const savedEmotion =
+    localStorage.getItem("fish.emotion");
+
+  if (savedEmotion) {
+    selectedEmotion = savedEmotion;
+    document.querySelectorAll(".emotion").forEach(btn => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.emotion === selectedEmotion
+      );
+    });
+  }
+
+  resumeActiveJob();
+    showStatus("✅ تم إنشاء الصوت المستنسخ", "success");
+  } catch (e) {
+    showStatus("❌ " + e.message, "error");
+  }
+}

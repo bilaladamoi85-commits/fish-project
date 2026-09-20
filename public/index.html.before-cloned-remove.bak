@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Emotional AI Voice Generator</title>
+<link rel="stylesheet" href="styles.css">
+
+<style>
+/* Voice search cleanup */
+#voiceResultCount {
+  display: none !important;
+}
+
+#loadMoreVoices,
+#refreshVoices,
+.voice-load-more,
+.voice-refresh,
+.voice-results-actions,
+.voice-pagination,
+.voice-loading-status,
+.voice-result-status,
+.voice-load-status,
+button[data-action="load-more"],
+button[data-action="refresh"],
+button.load-more,
+button.refresh-voices {
+  display: none !important;
+}
+
+/* Search voice cards */
+#voiceSearchResultsBox {
+  width: 100%;
+}
+
+.voice-card {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  margin: 8px 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.voice-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.voice-card-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.08);
+  font-size: 21px;
+}
+
+.voice-card-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.voice-card-name {
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.voice-card-tag {
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  opacity: .85;
+}
+
+.voice-card-save {
+  width: 48px;
+  min-width: 48px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.voice-card.selected {
+  outline: 1px solid rgba(255,255,255,.18);
+}
+
+.voice-card-check {
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.voice-no-results {
+  padding: 14px;
+  opacity: .7;
+}
+</style>
+
+</head>
+<body>
+<div class="container">
+
+<header class="hero">
+  <h1>🎤 Emotional AI Voice Generator</h1>
+  <p>Transform text into emotional speech using Voice Studio API</p>
+  <div id="healthStatus" class="status">Loading...</div>
+</header>
+
+<section class="card">
+  <h2>🎙️ Select Voice</h2>
+
+<div class="voice-modern">
+<select id="languageSelect" style="display:none"><option value="">All</option></select>
+
+  <div class="voice-search-wrap">
+    <span class="voice-search-icon">🔎</span>
+    <input
+      id="voiceSearch"
+      class="input voice-modern-search"
+      type="search"
+      placeholder="Search voice by name..."
+      autocomplete="off"
+    >
+  </div>
+<div id="recentVoicesBox"></div>
+
+  <div class="voice-results-head">
+    <div>
+      <span class="voice-results-title">🎙️ Voices</span>
+      <span id="voiceResultCount" class="voice-result-count"></span>
+    </div>
+  </div>
+
+  <div id="voiceSearchResultsBox" class="voice-cards"></div>
+<select id="voiceSelect" style="display:none!important"></select>
+
+  <div id="voiceInfo" class="voice-info"></div>
+
+</div>
+
+<style>
+.voice-modern {
+  width:100%;
+}
+
+.voice-search-wrap {
+  position:relative;
+  margin:12px 0;
+}
+
+.voice-modern-search {
+  width:100%;
+  box-sizing:border-box;
+  padding:15px 48px 15px 18px !important;
+  border-radius:16px !important;
+  font-size:16px !important;
+}
+
+.voice-search-icon {
+  position:absolute;
+  right:17px;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:21px;
+  opacity:.75;
+  pointer-events:none;
+}
+
+.voice-filters {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+  margin:10px 0 16px;
+}
+
+.voice-filter {
+  width:100%;
+  min-width:0;
+  padding:12px 10px;
+  border-radius:13px;
+  border:1px solid rgba(255,255,255,.13);
+  background:rgba(255,255,255,.055);
+  color:inherit;
+  font-size:13px;
+  outline:none;
+}
+
+.voice-filter:focus {
+  border-color:rgba(100,160,255,.65);
+}
+
+.voice-results-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin:4px 2px 10px;
+}
+
+.voice-results-title {
+  font-size:16px;
+  font-weight:800;
+}
+
+.voice-result-count {
+  margin-left:7px;
+  font-size:12px;
+  opacity:.55;
+}
+
+.voice-cards {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+  gap:11px;
+}
+
+.voice-card {
+  position:relative;
+  padding:14px;
+  min-height:126px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.10);
+  background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025));
+  box-shadow:0 7px 22px rgba(0,0,0,.12);
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+  cursor:pointer;
+  box-sizing:border-box;
+}
+
+.voice-card:hover {
+  transform:translateY(-2px);
+  border-color:rgba(120,170,255,.42);
+  box-shadow:0 10px 28px rgba(0,0,0,.19);
+}
+
+.voice-card.selected {
+  border-color:rgba(90,150,255,.85);
+  box-shadow:0 0 0 2px rgba(90,150,255,.15),0 10px 28px rgba(0,0,0,.18);
+}
+
+.voice-card-top {
+  display:flex;
+  align-items:flex-start;
+  gap:11px;
+}
+
+.voice-avatar {
+  width:46px;
+  height:46px;
+  min-width:46px;
+  border-radius:15px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+  background:linear-gradient(145deg,rgba(100,150,255,.24),rgba(255,255,255,.07));
+  border:1px solid rgba(255,255,255,.12);
+}
+
+.voice-card-name {
+  font-weight:750;
+  font-size:14px;
+  line-height:19px;
+  padding-right:28px;
+  word-break:break-word;
+}
+
+.voice-card-meta {
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-top:7px;
+}
+
+.voice-tag {
+  padding:4px 7px;
+  border-radius:8px;
+  font-size:10px;
+  background:rgba(255,255,255,.065);
+  opacity:.78;
+}
+
+.voice-save {
+  position:absolute;
+  right:10px;
+  top:10px;
+  width:34px;
+  height:34px;
+  border:0;
+  border-radius:10px;
+  background:rgba(255,255,255,.075);
+  color:inherit;
+  font-size:17px;
+  cursor:pointer;
+}
+
+.voice-save.saved {
+  background:rgba(65,160,95,.20);
+}
+
+.voice-selected {
+  position:absolute;
+  right:11px;
+  bottom:10px;
+  font-size:12px;
+  opacity:.9;
+}
+
+
+
+.voice-select {
+  display:none !important;
+}
+
+.voice-info {
+  margin-top:12px;
+}
+
+#recentVoicesBox {
+  margin-bottom:16px;
+}
+
+.recent-voice-inner {
+  padding:13px;
+  border-radius:17px;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.09);
+}
+
+.recent-voice-title {
+  font-size:13px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+
+.recent-voice-list {
+  display:flex;
+  gap:9px;
+  overflow-x:auto;
+  padding:2px 2px 6px;
+}
+
+.recent-voice-item {
+  position:relative;
+  flex:0 0 68px;
+  text-align:center;
+}
+
+.recent-voice-button {
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.18);
+  background:linear-gradient(145deg,rgba(100,150,255,.22),rgba(255,255,255,.06));
+  color:inherit;
+  font-size:23px;
+  cursor:pointer;
+}
+
+.recent-voice-name {
+  margin-top:6px;
+  font-size:10px;
+  line-height:13px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.recent-voice-delete {
+  position:absolute;
+  top:-3px;
+  right:2px;
+  width:20px;
+  height:20px;
+  border:0;
+  border-radius:50%;
+  background:#e04444;
+  color:#fff;
+  font-size:14px;
+  line-height:18px;
+  cursor:pointer;
+}
+
+@media(max-width:600px) {
+  .voice-cards {
+    grid-template-columns:1fr;
+  }
+
+  .voice-filters {
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media(max-width:380px) {
+  .voice-filters {
+    grid-template-columns:1fr;
+  }
+}
+</style>
+
+  <div class="voice-actions">
+    <button id="loadMoreBtn" class="btn secondary">⬇️ Load More Voices</button>
+    <button id="refreshBtn" class="btn secondary">🔄 Refresh</button>
+  </div>
+
+  <div id="voiceStatus" class="small"></div>
+</section>
+
+<section class="card">
+  <h2>🎯 Your Cloned Voices</h2>
+  <select id="clonedVoiceSelect" class="input">
+    <option value="">No cloned voices yet</option>
+  </select>
+  <button class="btn secondary" onclick="showCloneForm()">➕ Clone Your Voice</button>
+</section>
+
+<section class="card">
+  <h2>📝 Text to Speech</h2>
+
+  <textarea id="textInput" class="textarea"
+    placeholder="Write your text here..."
+    maxlength="50000">السلام عليكم</textarea>
+
+  <div class="counter-row">
+    <span id="charCount">0 / 50000 characters</span>
+    <span id="chunkInfo">⚡ Up to 50,000 characters</span>
+  </div>
+
+  <h3>Choose Emotion</h3>
+
+  <div class="emotions">
+    <button class="emotion active" data-emotion="neutral">😐 Neutral</button>
+    <button class="emotion" data-emotion="excited">🤩 Excited</button>
+    <button class="emotion" data-emotion="sad">😢 Sad</button>
+    <button class="emotion" data-emotion="angry">😠 Angry</button>
+    <button class="emotion" data-emotion="calm">🧘 Calm</button>
+    <button class="emotion" data-emotion="whispering">🤫 Whispering</button>
+    <button class="emotion" data-emotion="laughing">😂 Laughing</button>
+    <button class="emotion" data-emotion="emphasis">✨ Emphasis</button>
+  </div>
+
+  <button id="generateBtn" class="btn primary" onclick="generateSpeech()">
+    🎙️ Generate Speech
+  </button>
+
+  <div id="progressBox" class="progress-box hidden">
+    <div class="progress-title" id="progressText">Preparing...</div>
+
+    <div class="time-row">
+      <div class="time-card elapsed-card">
+        <span class="time-label">⏱️ الوقت المنقضي</span>
+        <strong id="elapsedTime">0s</strong>
+      </div>
+
+      <div class="time-card remaining-card">
+        <span class="time-label">⏳ باقي تقريباً</span>
+        <strong id="remainingTime">120s</strong>
+      </div>
+    </div>
+
+    <div class="progress-bar">
+      <div id="progressFill"></div>
+    </div>
+  </div>
+
+  <div id="statusBox" class="status-box"></div>
+</section>
+
+<section id="audioSection" class="card hidden">
+  <h2>🎧 Generated Audio</h2>
+  <audio id="audioPlayer" controls preload="metadata"></audio>
+
+  <div class="audio-actions">
+    <button class="btn primary" onclick="downloadAudio()">⬇️ Download MP3</button>
+    <button class="btn secondary" onclick="copyAudioUrl()">📋 Copy Audio URL</button>
+  </div>
+
+  <div id="audioMeta" class="small"></div>
+</section>
+
+<div id="cloneModal" class="modal hidden">
+  <div class="modal-box">
+    <button class="close" onclick="hideCloneForm()">×</button>
+    <h2>🎙️ Clone Your Voice</h2>
+    <p class="small">Voice cloning endpoint can be connected to your Voice Studio setup.</p>
+
+    <input id="voiceTitle" class="input" placeholder="Voice name">
+
+    <div id="audioUrlsContainer">
+      <input class="input audio-url-input" placeholder="https://example.com/audio1.wav">
+    </div>
+
+    <button class="btn secondary" onclick="addAudioUrlInput()">➕ Add audio URL</button>
+    <button class="btn primary" onclick="submitVoiceClone()">Create Clone</button>
+  </div>
+</div>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
+<style id="clean-voice-ui-final">
+/* إخفاء الوصف الطويل ومعلومات الصوت القديمة */
+#voiceInfo,
+.voice-info,
+.voice-description,
+.voice-long-description,
+.voice-meta-description,
+.voice-result-status,
+.voice-load-status,
+.voice-load-more,
+#loadMoreVoices,
+#refreshVoices,
+.voice-refresh,
+.voice-results-actions,
+.voice-pagination,
+.voice-loading-status {
+  display: none !important;
+}
+
+/* أي عناصر قديمة فيها Load More / Refresh */
+button[data-action="load-more"],
+button[data-action="refresh"],
+button.load-more,
+button.refresh-voices {
+  display: none !important;
+}
+</style>

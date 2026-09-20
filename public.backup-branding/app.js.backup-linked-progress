@@ -1,0 +1,762 @@
+const API = location.origin;
+let voices = [];
+let page = 1;
+const pageSize = 50;
+let hasMore = true;
+let selectedEmotion = "neutral";
+let generatedAudioUrl = "";
+let searchTimer = null;
+let generationPoller = null;
+let generationCountdownTimer = null;
+let generationRemaining = 120;
+
+const $ = id => document.getElementById(id);
+
+document.addEventListener("DOMContentLoaded", () => {
+  updateCounter();
+  setupEvents();
+  checkHealth();
+  loadVoices(true);
+  loadClonedVoices();
+});
+
+function setupEvents() {
+  $("textInput").addEventListener("input", updateCounter);
+
+  document.querySelectorAll(".emotion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".emotion").forEach(x => x.classList.remove("active"));
+      btn.classList.add("active");
+      selectedEmotion = btn.dataset.emotion;
+    });
+  });
+
+  $("voiceSearch").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadVoices(true), 300);
+  });
+
+  $("languageSelect").addEventListener("change", () => loadVoices(true));
+  $("loadMoreBtn").addEventListener("click", () => loadVoices(false));
+  $("refreshBtn").addEventListener("click", () => loadVoices(true));
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/api/health`);
+    const d = await r.json();
+
+    $("healthStatus").textContent = d.fishConfigured
+      ? "🟢 Fish Audio connected"
+      : "🔴 Fish Audio API key missing";
+
+    $("healthStatus").className = d.fishConfigured
+      ? "status ok"
+      : "status error";
+  } catch {
+    $("healthStatus").textContent = "🔴 Server unavailable";
+    $("healthStatus").className = "status error";
+  }
+}
+
+async function loadVoices(reset = false) {
+  const search = $("voiceSearch").value.trim();
+  const language = $("languageSelect").value;
+
+  if (reset) {
+    page = 1;
+    hasMore = true;
+    voices = [];
+    $("voiceSelect").innerHTML = `<option value="">Loading voices...</option>`;
+  }
+
+  if (!hasMore && !reset) return;
+
+  $("loadMoreBtn").disabled = true;
+  $("loadMoreBtn").textContent = "⏳ Loading...";
+
+  try {
+    const params = new URLSearchParams({
+      page: page,
+      pageSize: pageSize
+    });
+
+    if (search) params.set("search", search);
+    if (language) params.set("language", language);
+
+    const r = await fetch(`${API}/api/voices?${params}`);
+    if (!r.ok) throw new Error("Voice request failed");
+
+    const data = await r.json();
+    const items = data.voices || data.models || data.items || [];
+
+    if (reset) voices = [];
+
+    const existing = new Set(voices.map(v => v.id));
+    for (const v of items) {
+      if (v.id && !existing.has(v.id)) voices.push(v);
+    }
+
+    hasMore = Boolean(data.hasMore) || items.length >= pageSize;
+    page++;
+
+    renderVoices();
+
+    $("voiceStatus").textContent =
+      `✅ تم تحميل النتائج (${voices.length})`;
+  } catch (e) {
+    $("voiceStatus").textContent = "❌ تعذر تحميل الأصوات: " + e.message;
+  } finally {
+    $("loadMoreBtn").disabled = !hasMore;
+    $("loadMoreBtn").textContent =
+      hasMore ? "⬇️ Load More Voices" : "✅ All loaded";
+  }
+}
+
+function renderVoices() {
+  const select = $("voiceSelect");
+  const previous = select.value;
+
+  select.innerHTML = "";
+
+  if (!voices.length) {
+    select.innerHTML = `<option value="">No voices found</option>`;
+    $("voiceInfo").textContent = "";
+    return;
+  }
+
+  voices.forEach((v, i) => {
+    const option = document.createElement("option");
+    option.value = v.id || "";
+    option.textContent =
+      v.title ||
+      v.name ||
+      `Voice ${i + 1}`;
+    select.appendChild(option);
+  });
+
+  if (voices.some(v => v.id === previous)) {
+    select.value = previous;
+  }
+
+  showVoiceInfo();
+  select.onchange = showVoiceInfo;
+}
+
+function showVoiceInfo() {
+  const v = voices.find(x => x.id === $("voiceSelect").value);
+  if (!v) {
+    $("voiceInfo").textContent = "";
+    return;
+  }
+
+  const title = v.title || v.name || "";
+  const lang = v.language || "";
+  const desc = v.description || "";
+  const tags = Array.isArray(v.tags) ? v.tags.join(", ") : "";
+
+  $("voiceInfo").textContent =
+    [title, lang, tags, desc].filter(Boolean).join(" • ");
+}
+
+function updateCounter() {
+  const n = $("textInput").value.length;
+  $("charCount").textContent =
+    `${n.toLocaleString()} / 50,000 characters`;
+
+  if (n > 8000) {
+    const chunks = Math.ceil(n / 900);
+    $("chunkInfo").textContent =
+      `⚡ ~${chunks} chunks × ~900 chars • 10 parallel`;
+  } else {
+    $("chunkInfo").textContent =
+      "⚡ Single request";
+  }
+}
+
+async function generateSpeech() {
+  const text = $("textInput").value.trim();
+  const voiceId = $("voiceSelect").value;
+
+  if (!text) {
+    showStatus("⚠️ كتب النص أولاً", "error");
+    return;
+  }
+
+  if (!voiceId) {
+    showStatus("⚠️ اختار Voice أولاً", "error");
+    return;
+  }
+
+  if (text.length > 50000) {
+    showStatus("⚠️ الحد الأقصى هو 50,000 حرف", "error");
+    return;
+  }
+
+  const btn = $("generateBtn");
+
+  btn.disabled = true;
+  btn.textContent = "⏳ Generating...";
+
+  $("progressBox").classList.remove("hidden");
+  $("audioSection").classList.add("hidden");
+
+  // Stop old timers.
+  clearInterval(generationCountdownTimer);
+  clearInterval(generationPoller);
+
+  generationCountdownTimer = null;
+  generationPoller = null;
+
+  /*
+   * =========================================================
+   * ONE SINGLE CLOCK
+   * =========================================================
+   *
+   * elapsedTime  = actual time passed
+   * remainingTime = server estimate based on the same clock
+   * progress bar = actual server job state
+   *
+   * Nothing is allowed to show 100% until /api/tts returns.
+   */
+
+  const startedAt = Date.now();
+
+  // Initial estimate only.
+  // It can grow if the server needs more time.
+  let estimatedTotalSeconds = 120;
+
+  let lastProgressPercent = 5;
+  let jobFinished = false;
+  let jobFailed = false;
+
+  generationRemaining = 120;
+
+  const jobId =
+    (crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+  function updateClocks() {
+    if (jobFinished) return;
+
+    const elapsed = Math.floor(
+      (Date.now() - startedAt) / 1000
+    );
+
+    /*
+     * Remaining is NEVER allowed to finish the job.
+     *
+     * If estimate reaches zero but the server is still working,
+     * keep it at 1s and continue counting elapsed time.
+     */
+    const remaining = Math.max(
+      1,
+      Math.ceil(
+        estimatedTotalSeconds - elapsed
+      )
+    );
+
+    generationRemaining = remaining;
+
+    const elapsedEl = $("elapsedTime");
+    const remainingEl = $("remainingTime");
+
+    if (elapsedEl) {
+      elapsedEl.textContent = `${elapsed}s`;
+    }
+
+    if (remainingEl) {
+      remainingEl.textContent = `${remaining}s`;
+    }
+  }
+
+  /*
+   * Initial UI state.
+   */
+  updateClocks();
+
+  setProgress(
+    5,
+    "🚀 Preparing text..."
+  );
+
+  /*
+   * ONE clock for both left/right timers.
+   */
+  generationCountdownTimer =
+    setInterval(updateClocks, 1000);
+
+  /*
+   * =========================================================
+   * REAL SERVER PROGRESS
+   * =========================================================
+   *
+   * This controls the progress bar.
+   *
+   * The bar can NEVER reach 100% here.
+   * Only the actual /api/tts response can do that.
+   */
+  generationPoller = setInterval(async () => {
+    if (jobFinished || jobFailed) {
+      return;
+    }
+
+    try {
+      const progressResponse = await fetch(
+        `${API}/api/tts-progress/${jobId}`,
+        {
+          cache: "no-store"
+        }
+      );
+
+      if (!progressResponse.ok) {
+        return;
+      }
+
+      const progress =
+        await progressResponse.json();
+
+      if (progress.failed) {
+        jobFailed = true;
+        return;
+      }
+
+      if (progress.finished) {
+        return;
+      }
+
+      const elapsed =
+        (Date.now() - startedAt) / 1000;
+
+      /*
+       * =====================================================
+       * LINK REMAINING TIME TO SERVER ETA
+       * =====================================================
+       *
+       * Example:
+       * elapsed = 20s
+       * ETA     = 15s
+       *
+       * estimatedTotal = 35s
+       *
+       * The same estimate drives the right-side counter.
+       *
+       * If server later needs more time, estimate grows.
+       * It never prematurely declares completion.
+       */
+      if (
+        progress.eta !== null &&
+        Number.isFinite(Number(progress.eta))
+      ) {
+        const serverEta =
+          Math.max(
+            0,
+            Number(progress.eta)
+          );
+
+        const serverTotal =
+          elapsed + serverEta;
+
+        /*
+         * Never shrink the estimate too aggressively.
+         * This prevents:
+         * 42s -> 12s -> 38s -> 7s
+         *
+         * from causing visible jumping.
+         */
+        estimatedTotalSeconds =
+          Math.max(
+            estimatedTotalSeconds,
+            serverTotal
+          );
+      }
+
+      /*
+       * Update the RIGHT timer immediately after
+       * receiving the server estimate.
+       */
+      updateClocks();
+
+      /*
+       * =====================================================
+       * PROGRESS BAR
+       * =====================================================
+       */
+
+      if (progress.merging) {
+        /*
+         * Merging is real work.
+         * Keep the bar at 97% until final MP3 is returned.
+         */
+        lastProgressPercent =
+          Math.max(
+            lastProgressPercent,
+            97
+          );
+
+        setProgress(
+          Math.min(
+            99,
+            lastProgressPercent
+          ),
+          `🔄 دمج الصوت... • ${progress.completed}/${progress.total}`
+        );
+
+        return;
+      }
+
+      if (progress.total > 1) {
+        const completed =
+          Number(progress.completed) || 0;
+
+        const total =
+          Math.max(
+            1,
+            Number(progress.total)
+          );
+
+        /*
+         * Actual chunk progress.
+         *
+         * IMPORTANT:
+         * Maximum is 94%.
+         *
+         * So the line cannot finish before
+         * the final MP3 actually comes back.
+         */
+        const chunkPercent =
+          Math.round(
+            (completed / total) * 90
+          );
+
+        const percent =
+          Math.max(
+            lastProgressPercent,
+            Math.min(
+              94,
+              8 + chunkPercent
+            )
+          );
+
+        lastProgressPercent =
+          percent;
+
+        setProgress(
+          percent,
+          `🎙️ جاري التوليد... • ${completed}/${total}`
+        );
+
+      } else {
+        /*
+         * Single request.
+         * We don't fake completion.
+         */
+        const percent =
+          Math.max(
+            lastProgressPercent,
+            Math.min(
+              90,
+              15
+            )
+          );
+
+        lastProgressPercent =
+          percent;
+
+        setProgress(
+          percent,
+          "🎙️ جاري توليد الصوت..."
+        );
+      }
+
+    } catch (_) {
+      /*
+       * Network polling failure must NOT stop
+       * the main TTS request or the clocks.
+       */
+    }
+
+  }, 500);
+
+  try {
+    /*
+     * =========================================================
+     * MAIN TTS REQUEST
+     * =========================================================
+     */
+    const response = await fetch(
+      `${API}/api/tts`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-TTS-Job-Id": jobId
+        },
+        body: JSON.stringify({
+          text,
+          voiceId,
+          emotion: selectedEmotion
+        })
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        "TTS request failed"
+      );
+    }
+
+    /*
+     * =========================================================
+     * AUDIO IS ACTUALLY READY
+     * =========================================================
+     *
+     * Only HERE we stop everything.
+     */
+    jobFinished = true;
+
+    clearInterval(
+      generationCountdownTimer
+    );
+
+    clearInterval(
+      generationPoller
+    );
+
+    generationCountdownTimer = null;
+    generationPoller = null;
+
+    /*
+     * Calculate exact final processing time.
+     */
+    const finalSeconds =
+      data.processingSeconds ??
+      (
+        (Date.now() - startedAt) /
+        1000
+      );
+
+    /*
+     * Freeze both clocks.
+     */
+    const finalElapsed =
+      Math.max(
+        0,
+        Math.floor(
+          Number(finalSeconds)
+        )
+      );
+
+    const elapsedEl =
+      $("elapsedTime");
+
+    const remainingEl =
+      $("remainingTime");
+
+    if (elapsedEl) {
+      elapsedEl.textContent =
+        `${finalElapsed}s`;
+    }
+
+    if (remainingEl) {
+      remainingEl.textContent =
+        "0s";
+    }
+
+    /*
+     * NOW and ONLY NOW:
+     * progress = 100%
+     */
+    setProgress(
+      100,
+      `✅ Complete • ${Number(finalSeconds).toFixed(1)}s`
+    );
+
+    generatedAudioUrl =
+      data.audioUrl || "";
+
+    if (!generatedAudioUrl) {
+      throw new Error(
+        "Server returned no audio URL"
+      );
+    }
+
+    /*
+     * Load final MP3.
+     */
+    const audio =
+      $("audioPlayer");
+
+    audio.src =
+      generatedAudioUrl;
+
+    audio.load();
+
+    $("audioSection")
+      .classList
+      .remove("hidden");
+
+    $("audioMeta").textContent =
+      `🎙️ Voice: ${data.voiceId || voiceId} • ` +
+      `📦 Parts: ${data.chunks || 1} • ` +
+      `⚡ Processing: ${data.processingSeconds || "?"}s`;
+
+    showStatus(
+      "✅ تم إنشاء الصوت بنجاح 🎉",
+      "success"
+    );
+
+    setTimeout(() => {
+      audio.play().catch(() => {});
+
+      $("audioSection")
+        .scrollIntoView({
+          behavior: "smooth"
+        });
+    }, 200);
+
+  } catch (e) {
+    jobFailed = true;
+
+    clearInterval(
+      generationCountdownTimer
+    );
+
+    clearInterval(
+      generationPoller
+    );
+
+    generationCountdownTimer = null;
+    generationPoller = null;
+
+    console.error(e);
+
+    showStatus(
+      "❌ " + e.message,
+      "error"
+    );
+
+    $("progressBox")
+      .classList
+      .add("hidden");
+
+  } finally {
+    btn.disabled = false;
+    btn.textContent =
+      "🎙️ Generate Speech";
+  }
+}
+
+function setProgress(percent, text) {
+  $("progressFill").style.width = percent + "%";
+  $("progressText").textContent = text;
+}
+
+function showStatus(message, type) {
+  const box = $("statusBox");
+  box.textContent = message;
+  box.className = "status-box " + type;
+}
+
+function downloadAudio() {
+  if (!generatedAudioUrl) {
+    showStatus("⚠️ ما كاين حتى صوت جاهز للتحميل", "error");
+    return;
+  }
+
+  const a = document.createElement("a");
+  a.href = generatedAudioUrl;
+  a.download = "fish-audio.mp3";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function copyAudioUrl() {
+  if (!generatedAudioUrl) {
+    showStatus("⚠️ ما كاين حتى صوت جاهز", "error");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(generatedAudioUrl);
+    showStatus("📋 تم نسخ رابط الصوت", "success");
+  } catch {
+    showStatus("⚠️ المتصفح منع نسخ الرابط", "error");
+  }
+}
+
+async function loadClonedVoices() {
+  try {
+    const r = await fetch(`${API}/api/my-voices`);
+    if (!r.ok) return;
+
+    const data = await r.json();
+    const items = data.voices || [];
+
+    const select = $("clonedVoiceSelect");
+    select.innerHTML = "";
+
+    if (!items.length) {
+      select.innerHTML = `<option value="">No cloned voices yet</option>`;
+      return;
+    }
+
+    items.forEach(v => {
+      const o = document.createElement("option");
+      o.value = v.id || "";
+      o.textContent = v.title || v.name || v.id;
+      select.appendChild(o);
+    });
+  } catch {}
+}
+
+function showCloneForm() {
+  $("cloneModal").classList.remove("hidden");
+}
+
+function hideCloneForm() {
+  $("cloneModal").classList.add("hidden");
+}
+
+function addAudioUrlInput() {
+  const input = document.createElement("input");
+  input.className = "input audio-url-input";
+  input.placeholder = "https://example.com/audio.wav";
+  $("audioUrlsContainer").appendChild(input);
+}
+
+async function submitVoiceClone() {
+  const title = $("voiceTitle").value.trim();
+  const audioUrls = [...document.querySelectorAll(".audio-url-input")]
+    .map(x => x.value.trim())
+    .filter(Boolean);
+
+  if (!title || !audioUrls.length) {
+    alert("دخل اسم الصوت ورابط صوت واحد على الأقل.");
+    return;
+  }
+
+  try {
+    const r = await fetch(`${API}/api/clone-voice`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({title, audioUrls})
+    });
+
+    const d = await r.json();
+
+    if (!r.ok) throw new Error(d.error || "Clone failed");
+
+    hideCloneForm();
+    await loadClonedVoices();
+    showStatus("✅ تم إنشاء الصوت المستنسخ", "success");
+  } catch (e) {
+    showStatus("❌ " + e.message, "error");
+  }
+}

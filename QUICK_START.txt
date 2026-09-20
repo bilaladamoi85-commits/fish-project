@@ -1,0 +1,107 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   🎤 FISH AUDIO VOICE APP - QUICK START                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+✅ YOUR API KEY IS ALREADY CONFIGURED!
+
+The .env file contains your Fish Audio API key and is ready to use.
+⚠️  IMPORTANT: Keep .env file private - never share it publicly!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 INSTALLATION & STARTUP
+
+On Windows:
+  1. Double-click "start.bat"
+  2. Wait for dependencies to install (first run only)
+  3. Browser will open to http://localhost:3000
+
+Manual Start:
+  1. Open Command Prompt in this folder
+  2. Run: npm install  (first time only)
+  3. Run: npm start
+  4. Open http://localhost:3000 in browser
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎙️ FEATURES
+
+1. TEXT-TO-SPEECH
+   • Enter any text
+   • Choose from recommended voices
+   • Select an emotion (Excited, Sad, Calm, etc.)
+   • Generate audio instantly
+
+2. VOICE CLONING
+   • Clone your own voice
+   • Use your cloned voice for TTS
+   • Provide 1-5 audio sample URLs (10-60 seconds total)
+   • Free to clone!
+
+3. AUDIO MANAGEMENT
+   • Play generated audio in browser
+   • Download as MP3 file
+   • Copy audio URL to clipboard
+   • Check remaining API credits
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎭 AVAILABLE EMOTIONS
+
+😐 Neutral      🤩 Excited      😢 Sad          😠 Angry
+🧘 Calm         🤫 Whispering   😂 Laughing     ✨ Emphasis
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 CREDIT SYSTEM
+
+• Text-to-Speech: 1 credit per UTF-8 byte of text
+• Voice Cloning: FREE
+• Check your credits in the app's top-right corner
+• Upgrade: https://fish.audio/go-premium/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 FILE STRUCTURE
+
+server.js          → Express backend server
+package.json       → Node.js dependencies
+.env              → Your API key configuration (KEEP PRIVATE!)
+.env.example      → Example configuration template
+start.bat         → Windows startup script
+README.md         → Full documentation
+public/
+  ├─ index.html   → Main web interface
+  ├─ app.js       → Frontend JavaScript
+  └─ styles.css   → UI styling
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 TROUBLESHOOTING
+
+Problem: "Port 3000 already in use"
+Solution: Edit .env and change PORT to 3001, 3002, etc.
+
+Problem: "Failed to load voices"
+Solution: Check API key in .env file is correct
+
+Problem: "No audio generated"
+Solution: Ensure text is entered and voice is selected
+
+Problem: "Module not found error"
+Solution: Run "npm install" in command prompt
+
+For more help, see README.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 USEFUL LINKS
+
+Fish Audio Documentation: https://docs.fish.audio/
+API Reference: https://docs.fish.audio/api-reference/introduction
+Fish Audio Website: https://fish.audio/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Happy voice generating! 🎤✨
+
