@@ -13,7 +13,10 @@ const execFileAsync = promisify(execFile);
 const app = express();
 
 const ttsJobs = new Map();
-const RUNTIME_DIR = path.join(__dirname, 'runtime');
+const RUNTIME_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'fish-project')
+  : path.join(__dirname, 'runtime');
+
 const AUDIO_DIR = path.join(RUNTIME_DIR, 'audio');
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
