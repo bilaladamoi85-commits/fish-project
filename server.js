@@ -367,31 +367,7 @@ async function mergeMp3(buffers) {
      * This makes the transitions much cleaner.
      */
 
-    const filterParts = [];
-    const audioLabels = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const label = `a${i}`;
-
-      filterParts.push(
-        `[${i}:a]aresample=async=1:first_pts=0[${label}]`
-      );
-
-      audioLabels.push(`[${label}]`);
-    }
-
-    filterParts.push(
-      `${audioLabels.join('')}concat=n=${files.length}:v=0:a=1[outa]`
-    );
-
-    const outputFile = path.join(
-      tempDir,
-      'final.mp3'
-    );
-
-    const finalBuffer = Buffer.concat(
-      buffers.map(buffer => Buffer.from(buffer))
-    );
+    const finalBuffer = Buffer.concat(buffers.map(buffer => Buffer.from(buffer)));
 
 
       fs.readFileSync(outputFile);
