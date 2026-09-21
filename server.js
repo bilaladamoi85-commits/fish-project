@@ -370,7 +370,6 @@ async function mergeMp3(buffers) {
     const finalBuffer = Buffer.concat(buffers.map(buffer => Buffer.from(buffer)));
 
 
-      fs.readFileSync(outputFile);
 
     console.log(
       `🔗 MP3 merge complete: ${files.length} parts -> ${(
