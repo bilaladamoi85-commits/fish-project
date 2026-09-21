@@ -14,10 +14,6 @@ const ffmpegPath = process.env.VERCEL
   ? require('ffmpeg-static')
   : 'ffmpeg';
 
-const ffprobePath = process.env.VERCEL
-  ? require('@derhuerst/ffprobe-static')
-  : 'ffprobe';
-
 const app = express();
 
 const ttsJobs = new Map();
