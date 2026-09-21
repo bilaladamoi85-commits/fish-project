@@ -205,6 +205,69 @@ button.refresh-voices {
 }
 </style>
 
+
+<style id="fish-project-modal-style">
+#fish-project-modal-style {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+}
+
+#adModal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(5px);
+}
+
+#adModal .modal-content {
+  width: min(430px, 100%);
+  padding: 24px;
+  border-radius: 20px;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  text-align: center;
+}
+
+#adModal #modalMessage {
+  margin: 0 0 20px;
+  line-height: 1.7;
+  font-size: 16px;
+}
+
+#adModal .modal-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#adModal button {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+#adModal .btn-primary {
+  background: #111827;
+  color: #fff;
+}
+
+#adModal .btn-secondary {
+  background: #e5e7eb;
+  color: #111827;
+}
+</style>
+
 </head>
 <body>
 <!-- SPEAKORO TOP AD -->
@@ -588,9 +651,18 @@ button.refresh-voices {
     <button class="emotion" data-emotion="emphasis">✨ Emphasis</button>
   </div>
 
-  <button id="generateBtn" class="btn primary" type="button" onclick="generateSpeech()">
+  <button id="generateBtn" class="btn primary" type="button" onclick="showAdModal()">
     🎙️ Generate Speech
   </button>
+  <a
+    href="https://cowardrainbowactual.com/tht44es8sp?key=d7859f1b667778d53c4dfd041aaf0220"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="btn"
+    style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;"
+  >
+    📢 Sponsor
+  </a>
 
   <div id="progressBox" class="progress-box hidden">
     <div class="progress-title" id="progressText">Preparing...</div>
@@ -1043,6 +1115,20 @@ button.refresh-voices {
       };
     </script>
     <script src="https://www.highrevenueformat.com/508e5f01e39a99b2539ec5e370ab4e28/invoke.js"></script>
+  </div>
+</div>
+
+
+
+
+<div id="adModal" style="display:none;" class="modal" dir="rtl">
+  <div class="modal-content">
+    <p id="modalMessage"></p>
+
+    <div class="modal-buttons">
+      <button id="supportBtn" class="btn-primary" type="button"></button>
+      <button id="skipBtn" class="btn-secondary" type="button"></button>
+    </div>
   </div>
 </div>
 

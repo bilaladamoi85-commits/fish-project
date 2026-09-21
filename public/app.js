@@ -201,14 +201,17 @@ function renderVoices() {
     select.appendChild(option);
   });
 
-  // Do NOT auto-select an old saved voice.
-  // Only preserve the voice the user is currently using.
+  // Preserve the current voice, or restore the last selected voice.
+  const savedVoiceId = localStorage.getItem("fish.voiceId") || "";
+  const wantedVoiceId = previous || savedVoiceId;
+
   if (
-    previous &&
-    voices.some(v => String(v.id) === String(previous))
+    wantedVoiceId &&
+    voices.some(v => String(v.id) === String(wantedVoiceId))
   ) {
-    select.value = previous;
-  } else {
+    select.value = wantedVoiceId;
+    localStorage.setItem("fish.voiceId", wantedVoiceId);
+  } else if (!previous) {
     select.value = "";
   }
 
@@ -1401,6 +1404,7 @@ function prepareCinematicText(text) {
   return String(text || '').trim();
 }
 
+
 async function generateSpeech() {
     const generateButton = $("generateBtn");
     if (generateButton) {
@@ -1857,3 +1861,97 @@ window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
     window.renderRecentVoices();
   }
 };
+
+/* ================================
+   Speakoro Support Modal
+   ================================ */
+
+const SPEAKORO_SMARTLINK =
+  "https://cowardrainbowactual.com/tht44es8sp?key=d7859f1b667778d53c4dfd041aaf0220";
+
+const speakoroTranslations = {
+  ar: {
+    message:
+      "باش نقدّمو ليك هاد الخدمة مجاناً وبأعلى جودة، مصاريف السيرفرات كنوفرلوها بفضل دعمكم ❤️ ساعدنا نستمروا بزيارة رابط إعلاني خفيف. وتقدر تتجاوز المساعدة وتستعمل الخدمة مباشرة. شكراً بزاف على دعمك!",
+    support: "❤️ دعمنا وشاهد الإعلان",
+    skip: "تجاوز المساعدة"
+  },
+  en: {
+    message:
+      "To keep this service free and high quality, server costs are covered thanks to your support ❤️ You can support us by visiting a quick ad link, or skip and use the service directly. Thank you!",
+    support: "❤️ Support Us & View Ad",
+    skip: "Skip for now"
+  }
+};
+
+function getSpeakoroLanguage() {
+  const lang = (navigator.language || navigator.userLanguage || "ar").toLowerCase();
+  return lang.startsWith("ar") ? "ar" : "en";
+}
+
+function updateSpeakoroModal() {
+  const modal = document.getElementById("adModal");
+  const message = document.getElementById("modalMessage");
+  const support = document.getElementById("supportBtn");
+  const skip = document.getElementById("skipBtn");
+
+  if (!modal || !message || !support || !skip) return;
+
+  const lang = getSpeakoroLanguage();
+  const t = speakoroTranslations[lang];
+
+  modal.dir = lang === "ar" ? "rtl" : "ltr";
+  message.textContent = t.message;
+  support.textContent = t.support;
+  skip.textContent = t.skip;
+}
+
+function showAdModal() {
+  const modal = document.getElementById("adModal");
+
+  if (!modal) {
+    generateSpeech();
+    return;
+  }
+
+  updateSpeakoroModal();
+  modal.style.display = "flex";
+}
+
+function closeSpeakoroModal() {
+  const modal = document.getElementById("adModal");
+  if (modal) modal.style.display = "none";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const supportBtn = document.getElementById("supportBtn");
+  const skipBtn = document.getElementById("skipBtn");
+  const modal = document.getElementById("adModal");
+
+  if (supportBtn) {
+    supportBtn.addEventListener("click", () => {
+      window.open(
+        SPEAKORO_SMARTLINK,
+        "_blank",
+        "noopener,noreferrer"
+      );
+
+      closeSpeakoroModal();
+    });
+  }
+
+  if (skipBtn) {
+    skipBtn.addEventListener("click", () => {
+      closeSpeakoroModal();
+      generateSpeech();
+    });
+  }
+
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        closeSpeakoroModal();
+      }
+    });
+  }
+});
