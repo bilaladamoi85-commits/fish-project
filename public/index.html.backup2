@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Speakoro</title>
+<title>Emotional AI Voice Generator</title>
 <link rel="stylesheet" href="styles.css">
 
 <style>
@@ -210,7 +210,7 @@ button.refresh-voices {
 <div class="container">
 
 <header class="hero">
-  <h1>🎤 Speakoro</h1>
+  <h1>🎤 Emotional AI Voice Generator</h1>
   <p>Transform text into emotional speech using Voice Studio API</p>
   <div id="healthStatus" class="status">Loading...</div>
 </header>
@@ -234,17 +234,17 @@ button.refresh-voices {
 
   <div class="voice-filters">
     <select id="voiceLanguageFilter" class="voice-filter">
-      <option value="">🌐 Any Language</option>
+      <option value="">🌐 أي لغة</option>
     </select>
 
     <select id="voiceGenderSelect" class="voice-filter">
-      <option value="">⚥ Any Gender</option>
+      <option value="">⚥ أي جنس</option>
       <option value="male">♂ ذكر</option>
       <option value="female">♀ أنثى</option>
     </select>
 
     <select id="voiceCategoryFilter" class="voice-filter">
-      <option value="">🎙️ Any Category</option>
+      <option value="">🎙️ أي فئة</option>
     </select>
   </div>
 
@@ -726,264 +726,6 @@ button.refresh-voices {
   <span>•</span>
   <a href="#contact">Contact</a>
 </footer>
-
-
-<script id="speakoro-i18n">
-(() => {
-  const translations = {
-    en: {
-      "Search voice by name...": "Search voice by name...",
-      "Write your text here...": "Write your text here...",
-      "Neutral": "Neutral",
-      "Excited": "Excited",
-      "Sad": "Sad",
-      "Angry": "Angry",
-      "Calm": "Calm",
-      "Whispering": "Whispering",
-      "Laughing": "Laughing",
-      "Emphasis": "Emphasis",
-      "Download MP3": "Download MP3",
-      "Copy Audio URL": "Copy Audio URL",
-      "Voice name": "Voice name",
-      "Create Clone": "Create Clone",
-      "Add audio URL": "Add audio URL",
-      "About": "About",
-      "Privacy Policy": "Privacy Policy",
-      "Terms of Service": "Terms of Service",
-      "Contact": "Contact",
-      "Any Language": "Any Language",
-      "Any Gender": "Any Gender",
-      "Any Category": "Any Category",
-      "Voices": "Voices",
-      "Text to Speech": "Text to Speech",
-      "Choose Emotion": "Choose Emotion",
-      "Generate Speech": "Generate Speech",
-      "Single request": "Single request",
-      "Voice Studio connected": "Voice Studio connected"
-    },
-
-    ar: {
-      "Search voice by name...": "ابحث عن صوت بالاسم...",
-      "Write your text here...": "اكتب النص هنا...",
-      "Neutral": "محايد",
-      "Excited": "متحمس",
-      "Sad": "حزين",
-      "Angry": "غاضب",
-      "Calm": "هادئ",
-      "Whispering": "همس",
-      "Laughing": "ضحك",
-      "Emphasis": "تأكيد",
-      "Download MP3": "تحميل MP3",
-      "Copy Audio URL": "نسخ رابط الصوت",
-      "Voice name": "اسم الصوت",
-      "Create Clone": "إنشاء نسخة صوتية",
-      "Add audio URL": "إضافة رابط صوتي",
-      "About": "حول الموقع",
-      "Privacy Policy": "سياسة الخصوصية",
-      "Terms of Service": "شروط الاستخدام",
-      "Contact": "تواصل معنا",
-      "Any Language": "أي لغة",
-      "Any Gender": "أي جنس",
-      "Any Category": "أي فئة",
-      "Voices": "الأصوات",
-      "Text to Speech": "تحويل النص إلى كلام",
-      "Choose Emotion": "اختر المشاعر",
-      "Generate Speech": "توليد الصوت",
-      "Single request": "طلب واحد",
-      "Voice Studio connected": "Voice Studio متصل"
-    },
-
-    fr: {
-      "Search voice by name...": "Rechercher une voix par nom...",
-      "Write your text here...": "Écrivez votre texte ici...",
-      "Neutral": "Neutre",
-      "Excited": "Excité",
-      "Sad": "Triste",
-      "Angry": "En colère",
-      "Calm": "Calme",
-      "Whispering": "Chuchotement",
-      "Laughing": "Rire",
-      "Emphasis": "Emphase",
-      "Download MP3": "Télécharger MP3",
-      "Copy Audio URL": "Copier l’URL audio",
-      "Voice name": "Nom de la voix",
-      "Create Clone": "Créer une copie",
-      "Add audio URL": "Ajouter une URL audio",
-      "About": "À propos",
-      "Privacy Policy": "Politique de confidentialité",
-      "Terms of Service": "Conditions d’utilisation",
-      "Contact": "Contact",
-      "Any Language": "Toutes les langues",
-      "Any Gender": "Tous les genres",
-      "Any Category": "Toutes les catégories",
-      "Voices": "Voix",
-      "Text to Speech": "Synthèse vocale",
-      "Choose Emotion": "Choisir une émotion",
-      "Generate Speech": "Générer la voix",
-      "Single request": "Requête unique",
-      "Voice Studio connected": "Voice Studio connecté"
-    },
-
-    es: {
-      "Search voice by name...": "Buscar voz por nombre...",
-      "Write your text here...": "Escribe tu texto aquí...",
-      "Neutral": "Neutral",
-      "Excited": "Emocionado",
-      "Sad": "Triste",
-      "Angry": "Enojado",
-      "Calm": "Calmado",
-      "Whispering": "Susurro",
-      "Laughing": "Risa",
-      "Emphasis": "Énfasis",
-      "Download MP3": "Descargar MP3",
-      "Copy Audio URL": "Copiar URL de audio",
-      "Voice name": "Nombre de voz",
-      "Create Clone": "Crear clon",
-      "Add audio URL": "Añadir URL de audio",
-      "About": "Acerca de",
-      "Privacy Policy": "Política de privacidad",
-      "Terms of Service": "Términos de servicio",
-      "Contact": "Contacto",
-      "Any Language": "Cualquier idioma",
-      "Any Gender": "Cualquier género",
-      "Any Category": "Cualquier categoría",
-      "Voices": "Voces",
-      "Text to Speech": "Texto a voz",
-      "Choose Emotion": "Elegir emoción",
-      "Generate Speech": "Generar voz",
-      "Single request": "Solicitud única",
-      "Voice Studio connected": "Voice Studio conectado"
-    },
-
-    de: {
-      "Search voice by name...": "Stimme nach Namen suchen...",
-      "Write your text here...": "Text hier eingeben...",
-      "Neutral": "Neutral",
-      "Excited": "Aufgeregt",
-      "Sad": "Traurig",
-      "Angry": "Wütend",
-      "Calm": "Ruhig",
-      "Whispering": "Flüstern",
-      "Laughing": "Lachen",
-      "Emphasis": "Betonung",
-      "Download MP3": "MP3 herunterladen",
-      "Copy Audio URL": "Audio-URL kopieren",
-      "Voice name": "Stimmenname",
-      "Create Clone": "Klon erstellen",
-      "Add audio URL": "Audio-URL hinzufügen",
-      "About": "Über uns",
-      "Privacy Policy": "Datenschutzerklärung",
-      "Terms of Service": "Nutzungsbedingungen",
-      "Contact": "Kontakt",
-      "Any Language": "Jede Sprache",
-      "Any Gender": "Jedes Geschlecht",
-      "Any Category": "Jede Kategorie",
-      "Voices": "Stimmen",
-      "Text to Speech": "Text zu Sprache",
-      "Choose Emotion": "Emotion auswählen",
-      "Generate Speech": "Sprache generieren",
-      "Single request": "Einzelanfrage",
-      "Voice Studio connected": "Voice Studio verbunden"
-    }
-  };
-
-  const deviceLang = (navigator.language || "en").toLowerCase();
-
-  const lang =
-    Object.keys(translations).find(
-      x => deviceLang === x || deviceLang.startsWith(x + "-")
-    ) || "en";
-
-  const dict = translations[lang];
-
-  document.documentElement.lang = lang;
-  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
-
-  function translate(root = document.body) {
-    if (!root) return;
-
-    const walker = document.createTreeWalker(
-      root,
-      NodeFilter.SHOW_TEXT,
-      null
-    );
-
-    const nodes = [];
-
-    while (walker.nextNode()) {
-      const node = walker.currentNode;
-      const parent = node.parentElement;
-
-      if (!parent) continue;
-
-      if (
-        ["SCRIPT", "STYLE", "NOSCRIPT"].includes(parent.tagName)
-      ) {
-        continue;
-      }
-
-      nodes.push(node);
-    }
-
-    for (const node of nodes) {
-      const text = node.nodeValue;
-
-      for (const [source, target] of Object.entries(dict)) {
-        if (text.includes(source)) {
-          node.nodeValue = node.nodeValue.split(source).join(target);
-        }
-      }
-    }
-
-    root.querySelectorAll?.(
-      "input[placeholder], textarea[placeholder]"
-    ).forEach(el => {
-      const value = el.getAttribute("placeholder");
-
-      if (value && dict[value]) {
-        el.setAttribute("placeholder", dict[value]);
-      }
-    });
-
-    root.querySelectorAll?.(
-      "input[aria-label], button[aria-label]"
-    ).forEach(el => {
-      const value = el.getAttribute("aria-label");
-
-      if (value && dict[value]) {
-        el.setAttribute("aria-label", dict[value]);
-      }
-    });
-  }
-
-  function start() {
-    translate();
-
-    const observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            translate(node);
-          }
-        }
-      }
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    console.log("Speakoro language:", lang);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", start);
-  } else {
-    start();
-  }
-})();
-</script>
 
 </body>
 </html>

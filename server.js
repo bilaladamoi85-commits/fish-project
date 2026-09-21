@@ -1121,6 +1121,10 @@ app.post('/api/clone-voice', (req, res) => {
   });
 });
 
+app.get("/privacy", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
+app.get("/terms", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
+app.get("/about", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
+
 app.get('*', (req, res) => {
   res.sendFile(
     path.join(
@@ -1160,10 +1164,6 @@ app.get('/api/voice-avatar', async (req, res) => {
     return res.status(500).send('Avatar proxy error');
   }
 });
-
-app.get("/privacy", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
-app.get("/terms", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
-app.get("/about", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
 
 app.listen(PORT, () => {
   console.log('');

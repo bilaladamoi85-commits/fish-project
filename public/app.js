@@ -173,7 +173,7 @@ async function loadVoices(reset = false) {
     $("voiceStatus").textContent =
       `✅  (${voices.length})`;
   } catch (e) {
-    $("voiceStatus").textContent = "❌ تعذر تحميل الأصوات: " + e.message;
+    $("voiceStatus").textContent = "❌ Failed to load voices: " + e.message;
   } finally {
     if (loadMoreBtn) loadMoreBtn.disabled = !hasMore;
       if (loadMoreBtn) loadMoreBtn.textContent = hasMore ? "⬇️ " : "✅ All loaded";
@@ -314,7 +314,7 @@ function renderVoiceFilters(items) {
   )].sort();
 
   const languageNames = {
-    ar:"العربية",
+    ar:"Arabic",
     en:"English",
     fr:"Français",
     es:"Español",
@@ -337,7 +337,7 @@ function renderVoiceFilters(items) {
   };
 
   languageSelect.innerHTML =
-    '<option value="">أي لغة</option>';
+    '<option value="">Any Language</option>';
 
   languages.forEach(lang => {
     const o=document.createElement("option");
@@ -347,9 +347,9 @@ function renderVoiceFilters(items) {
   });
 
   genderSelect.innerHTML = `
-    <option value="">أي جنس</option>
-    <option value="male">ذكر</option>
-    <option value="female">أنثى</option>
+    <option value="">Any Gender</option>
+    <option value="male">Male</option>
+    <option value="female">Female</option>
   `;
 
   const categories = new Set();
@@ -378,7 +378,7 @@ function renderVoiceFilters(items) {
   });
 
   categorySelect.innerHTML =
-    '<option value="">أي فئة</option>';
+    '<option value="">Any Category</option>';
 
   [...categories]
     .sort((a,b)=>a.localeCompare(b))
@@ -698,7 +698,7 @@ async function previewVoice(id, button) {
           button.innerHTML = originalText || "▶";
         }
 
-        alert("Preview ما قدرش يخدم: ملف الصوت غير قابل للتشغيل.");
+        alert("Preview failed: audio file cannot be played.");
       };
 
       await audio.play();
@@ -712,7 +712,7 @@ async function previewVoice(id, button) {
       }
 
       alert(
-        "Preview ما قدرش يخدم: " +
+        "Preview failed: " +
         (error.message || "Failed to load")
       );
     });
@@ -1267,7 +1267,7 @@ function renderRecentVoices() {
     document.getElementById("voiceSelect")?.value || "";
 
   box.innerHTML = `
-    <div class="recent-voices-title">🕘 آخر الأصوات المحفوظة</div>
+    <div class="recent-voices-title">🕘 Recent Voices</div>
     <div class="recent-voices-list">
       ${recent.map(v => {
         const liveVoice =
@@ -1412,17 +1412,17 @@ async function generateSpeech() {
   const ttsText = cinematicMode ? prepareCinematicText(text) : text;
 
   if (!text) {
-    showStatus("⚠️ كتب النص أولاً", "error");
+    showStatus("⚠️ Please enter some text first", "error");
     return;
   }
 
   if (!voiceId) {
-    showStatus("⚠️ اختار Voice أولاً", "error");
+    showStatus("⚠️ Please select a voice first", "error");
     return;
   }
 
   if (text.length > 50000) {
-    showStatus("⚠️ الحد الأقصى هو 50,000 حرف", "error");
+    showStatus("⚠️ Maximum is 50,000 characters", "error");
     return;
   }
 
@@ -1560,7 +1560,7 @@ function startJobWatcher(jobId) {
         stopJobWatcher();
         localStorage.removeItem("fish.activeJobId");
         showStatus(
-          "❌ " + (p.error || "فشل إنشاء الصوت"),
+          "❌ " + (p.error || "Failed to generate speech"),
           "error"
         );
         btn.disabled = false;
@@ -1571,7 +1571,7 @@ function startJobWatcher(jobId) {
       if (p.merging) {
         setProgress(
           98,
-          `🔄 دمج الصوت... • ${p.completed}/${p.total}`
+          `🔄 Merging audio... • ${p.completed}/${p.total}`
         );
       } else if (p.total > 1) {
         const percent =
@@ -1584,12 +1584,12 @@ function startJobWatcher(jobId) {
 
         setProgress(
           percent,
-          `🎙️ جاري التوليد... • ${p.completed}/${p.total}`
+          `🎙️ Generating... • ${p.completed}/${p.total}`
         );
       } else {
         setProgress(
           15,
-          "🎙️ جاري توليد الصوت..."
+          "🎙️ Generating speech..."
         );
       }
 
@@ -1606,7 +1606,7 @@ function startJobWatcher(jobId) {
 
         setProgress(
           100,
-          "✅ الصوت جاهز"
+          "✅ Audio ready"
         );
 
         generatedAudioUrl =
@@ -1630,7 +1630,7 @@ function startJobWatcher(jobId) {
         localStorage.removeItem("fish.activeJobId");
 
         showStatus(
-          `✅ تم إنشاء الصوت في ${Number(
+          `✅ Speech created in ${Number(
             p.processingSeconds || elapsed
           ).toFixed(1)}s`,
           "success"
@@ -1688,7 +1688,7 @@ function downloadAudio() {
   }
 
   if (!generatedAudioUrl) {
-    showStatus("⚠️ ما كاين حتى صوت جاهز للتحميل", "error");
+    showStatus("⚠️ No audio is ready to download", "error");
     return;
   }
 
@@ -1702,15 +1702,15 @@ function downloadAudio() {
 
 async function copyAudioUrl() {
   if (!generatedAudioUrl) {
-    showStatus("⚠️ ما كاين حتى صوت جاهز", "error");
+    showStatus("⚠️ No audio is ready", "error");
     return;
   }
 
   try {
     await navigator.clipboard.writeText(generatedAudioUrl);
-    showStatus("📋 تم نسخ رابط الصوت", "success");
+    showStatus("📋 Audio URL copied", "success");
   } catch {
-    showStatus("⚠️ المتصفح منع نسخ الرابط", "error");
+    showStatus("⚠️ The browser blocked copying the URL", "error");
   }
 }
 
@@ -1738,7 +1738,7 @@ async function submitVoiceClone() {
     .filter(Boolean);
 
   if (!title || !audioUrls.length) {
-    alert("دخل اسم الصوت ورابط صوت واحد على الأقل.");
+    alert("Enter a voice name and at least one audio URL.");
     return;
   }
 
@@ -1770,7 +1770,7 @@ async function submitVoiceClone() {
   }
 
   resumeActiveJob();
-    showStatus("✅ تم إنشاء الصوت المستنسخ", "success");
+    showStatus("✅ Voice clone created", "success");
   } catch (e) {
     showStatus("❌ " + e.message, "error");
   }
@@ -1795,7 +1795,7 @@ window.saveVoiceManual = function(e, id, name, lang, audio) {
 
   if (index > -1) {
     saved.splice(index, 1);
-    alert('تمت إزالة "' + name + '" من قائمة المحفوظات');
+    alert('Removed "' + name + '" from saved voices');
   } else {
     saved.unshift({
       id: id || name,
@@ -1804,7 +1804,7 @@ window.saveVoiceManual = function(e, id, name, lang, audio) {
       audio: audio || '',
       date: new Date().toISOString()
     });
-    alert('تم حفظ "' + name + '" في قائمة المحفوظات بنجاح!');
+    alert('Saved "' + name + '" to saved voices successfully!');
   }
 
   localStorage.setItem('user_saved_voices', JSON.stringify(saved));
@@ -1821,7 +1821,7 @@ window.saveVoiceManual = function(e, id, name, lang, audio) {
 /* --- STRICT SEPARATED SAVE BUTTON --- */
 window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
   if (event) {
-    event.stopPropagation(); // منع الانتقال لصفحة الشخصية أو اختيارها
+    event.stopPropagation(); // Prevent navigation to the profile page or selection
     event.preventDefault();
   }
 
@@ -1836,7 +1836,7 @@ window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
 
   if (index > -1) {
     saved.splice(index, 1);
-    alert('تمت إزالة "' + voiceName + '" من قائمة المحفوظات');
+    alert('Removed "' + voiceName + '" from saved voices');
   } else {
     saved.unshift({
       id: voiceId || voiceName,
@@ -1845,7 +1845,7 @@ window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
       audio: audio || '',
       savedAt: new Date().toISOString()
     });
-    alert('تم حفظ "' + voiceName + '" في المحفوظات!');
+    alert('Saved "' + voiceName + '" to saved voices!');
   }
 
   localStorage.setItem('user_saved_voices', JSON.stringify(saved));
