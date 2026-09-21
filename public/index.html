@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Speakoro</title>
+    <link rel="icon" type="image/png" href="/icons/speakora-logo.png">
+    <link rel="apple-touch-icon" href="/icons/speakora-logo.png">
+
+    <meta property="og:site_name" content="SpeakOra">
+    <meta property="og:image" content="/icons/speakora-logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:image" content="/icons/speakora-logo.png">
+
+<title>SpeakOra</title>
 <link rel="stylesheet" href="styles.css">
 
 <style>
@@ -268,10 +276,30 @@ button.refresh-voices {
 }
 </style>
 
+
+<script id="speakora-schema" type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "SpeakOra",
+  "url": "https://fish-project-sigma.vercel.app/",
+  "logo": "https://fish-project-sigma.vercel.app/icons/speakora-logo.png"
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "SpeakOra",
+  "url": "https://fish-project-sigma.vercel.app/"
+}
+</script>
+
 </head>
 <body>
-<!-- SPEAKORO TOP AD -->
-<div id="speakoro-top-ad" style="
+<!-- SPEAKORA TOP AD -->
+<div id="speakora-top-ad" style="
   width:100%;
   display:flex;
   justify-content:center;
@@ -297,7 +325,7 @@ button.refresh-voices {
 <div class="container">
 
 <header class="hero">
-  <h1>🎤 Speakoro</h1>
+  <h1>🎤 SpeakOra</h1>
   <p>Transform text into emotional speech using Voice Studio API</p>
   <div id="healthStatus" class="status">Loading...</div>
 </header>
@@ -824,7 +852,7 @@ button.refresh-voices {
 </footer>
 
 
-<script id="speakoro-i18n">
+<script id="speakora-i18n">
 (() => {
   const translations = {
     en: {
@@ -1070,7 +1098,7 @@ button.refresh-voices {
       subtree: true
     });
 
-    console.log("Speakoro language:", lang);
+    console.log("SpeakOra language:", lang);
   }
 
   if (document.readyState === "loading") {
@@ -1094,8 +1122,8 @@ button.refresh-voices {
     'params' : {}
   };
 </script>
-<!-- SPEAKORO BOTTOM AD -->
-<div id="speakoro-bottom-ad" style="
+<!-- SPEAKORA BOTTOM AD -->
+<div id="speakora-bottom-ad" style="
   width:100%;
   display:flex;
   justify-content:center;
@@ -1130,6 +1158,41 @@ button.refresh-voices {
       <button id="skipBtn" class="btn-secondary" type="button"></button>
     </div>
   </div>
+</div>
+
+
+<!-- SpeakOra Premium Voice Modal -->
+<div id="premiumVoiceModal" class="premium-modal-overlay" style="display:none;" dir="rtl">
+  <div class="premium-modal-card">
+
+    <button
+      id="premiumVoiceClose"
+      class="premium-modal-close"
+      type="button"
+      aria-label="إغلاق"
+    >×</button>
+
+    <div class="premium-modal-icon">⭐</div>
+
+    <div class="premium-modal-badge">PREMIUM VOICE</div>
+
+    <h2 id="premiumVoiceTitle">⭐ Premium Voice</h2>
+
+    <p id="premiumVoiceMessage">
+      هذه الشخصية Premium. شاهد إعلانًا قصيرًا لدعم بقاء SpeakOra مجانيًا، ثم ارجع لمتابعة استخدام الصوت.
+    </p>
+
+    <button
+      id="premiumVoiceAdBtn"
+      class="premium-modal-ad-btn"
+      type="button"
+    >
+      <span>▶</span>
+      <span>مشاهدة الإعلان</span>
+    </button>
+
+  </div>
+</div>
 </div>
 
 </body>
@@ -2583,5 +2646,204 @@ button:active,
   text-overflow:ellipsis !important;
   white-space:nowrap !important;
   text-align:center !important;
+}
+</style>
+
+<style>
+/* ================================
+   SpeakOra Premium Voice Modal
+   ================================ */
+
+.premium-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 999999 !important;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(0, 0, 0, .58) !important;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+
+  box-sizing: border-box;
+}
+
+.premium-modal-card {
+  position: relative;
+
+  width: min(420px, calc(100vw - 36px));
+  box-sizing: border-box;
+
+  background: #ffffff !important;
+  color: #151515 !important;
+
+  border-radius: 24px;
+
+  padding: 30px 24px 24px;
+
+  text-align: center;
+
+  box-shadow:
+    0 25px 70px rgba(0,0,0,.28),
+    0 8px 25px rgba(0,0,0,.14);
+
+  border: 1px solid rgba(0,0,0,.08);
+
+  animation: speakoraPremiumIn .22s ease-out;
+}
+
+@keyframes speakoraPremiumIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.premium-modal-close {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+
+  width: 36px;
+  height: 36px;
+
+  border: 0;
+  border-radius: 50%;
+
+  background: #f1f1f1 !important;
+  color: #333 !important;
+
+  font-size: 27px;
+  line-height: 34px;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: .18s ease;
+}
+
+.premium-modal-close:hover {
+  background: #e5e5e5 !important;
+  transform: scale(1.06);
+}
+
+.premium-modal-icon {
+  width: 70px;
+  height: 70px;
+
+  margin: 4px auto 14px;
+
+  border-radius: 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 36px;
+
+  background: linear-gradient(135deg, #fff7cf, #ffe27a);
+  border: 1px solid #f3cf4a;
+
+  box-shadow: 0 8px 24px rgba(238,184,0,.20);
+}
+
+.premium-modal-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 6px 12px;
+
+  border-radius: 999px;
+
+  background: #fff4c2;
+  color: #9a7100;
+
+  border: 1px solid #efd36a;
+
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .7px;
+}
+
+.premium-modal-card h2 {
+  margin: 13px 0 9px;
+
+  color: #171717 !important;
+
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.premium-modal-card p {
+  margin: 0 auto 22px;
+
+  max-width: 340px;
+
+  color: #666 !important;
+
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.premium-modal-ad-btn {
+  width: 100%;
+
+  min-height: 52px;
+
+  border: 0;
+  border-radius: 14px;
+
+  background: linear-gradient(135deg, #111827, #252f43) !important;
+  color: #ffffff !important;
+
+  font-size: 15px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+
+  box-shadow: 0 10px 25px rgba(17,24,39,.20);
+
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.premium-modal-ad-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 13px 30px rgba(17,24,39,.27);
+}
+
+.premium-modal-ad-btn:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 480px) {
+  .premium-modal-card {
+    padding: 27px 18px 20px;
+    border-radius: 21px;
+  }
+
+  .premium-modal-card h2 {
+    font-size: 20px;
+  }
+
+  .premium-modal-card p {
+    font-size: 13px;
+  }
 }
 </style>
