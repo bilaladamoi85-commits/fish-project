@@ -1146,6 +1146,13 @@ function renderVoiceSearchResults() {
       const id = btn.getAttribute("data-voice-select");
       if (!id) return;
 
+      const searchInput = document.getElementById("voiceSearch");
+      if (searchInput) {
+        searchInput.value = "";
+        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        localStorage.removeItem(VOICE_SEARCH_KEY);
+      }
+
       const select = document.getElementById("voiceSelect");
       if (!select) return;
 
