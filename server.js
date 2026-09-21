@@ -174,7 +174,7 @@ async function getMp3Duration(buffer) {
     fs.writeFileSync(tempFile, buffer);
 
     const { stdout } = await execFileAsync(
-      'ffprobe',
+      ffprobePath,
       [
         '-v', 'error',
         '-show_entries', 'format=duration',
