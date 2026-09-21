@@ -5,15 +5,6 @@ const axios = require('axios');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-
-const execFileAsync = promisify(execFile);
-
-const ffmpegPath = process.env.VERCEL
-  ? require('ffmpeg-static')
-  : 'ffmpeg';
-
 const app = express();
 
 const ttsJobs = new Map();
@@ -398,61 +389,11 @@ async function mergeMp3(buffers) {
       'final.mp3'
     );
 
-    const args = [
-      '-y',
-      '-loglevel',
-      'error'
-    ];
-
-    for (const file of files) {
-      args.push('-i', file);
-    }
-
-    args.push(
-      '-filter_complex',
-      filterParts.join(';'),
-      '-map',
-      '[outa]',
-      '-vn',
-      '-c:a',
-      'libmp3lame',
-      '-b:a',
-      '192k',
-      '-ar',
-      '44100',
-      '-ac',
-      '2',
-      '-write_xing',
-      '1',
-      outputFile
+    const finalBuffer = Buffer.concat(
+      buffers.map(buffer => Buffer.from(buffer))
     );
 
-    await new Promise((resolve, reject) => {
-      execFile(
-        'ffmpeg',
-        args,
-        {
-          timeout: 300000,
-          maxBuffer: 10 * 1024 * 1024
-        },
-        (error, stdout, stderr) => {
-          if (error) {
-            reject(
-              new Error(
-                `FFmpeg merge failed: ${
-                  stderr || error.message
-                }`
-              )
-            );
-            return;
-          }
 
-          resolve();
-        }
-      );
-    });
-
-    const finalBuffer =
       fs.readFileSync(outputFile);
 
     console.log(
