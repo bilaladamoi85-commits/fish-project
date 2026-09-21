@@ -1161,6 +1161,10 @@ app.get('/api/voice-avatar', async (req, res) => {
   }
 });
 
+app.get("/privacy", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
+app.get("/terms", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
+app.get("/about", (req,res) => res.sendFile(path.join(__dirname,"public","legal.html")));
+
 app.listen(PORT, () => {
   console.log('');
   console.log(
