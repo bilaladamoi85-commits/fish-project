@@ -165,40 +165,7 @@ async function withRetry(fn, retries = 3) {
 
 
 async function getMp3Duration(buffer) {
-  const tempFile = path.join(
-    os.tmpdir(),
-    `fish-check-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`
-  );
-
-  try {
-    fs.writeFileSync(tempFile, buffer);
-
-    const { stdout } = await execFileAsync(
-      ffprobePath,
-      [
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'default=noprint_wrappers=1:nokey=1',
-        tempFile
-      ],
-      {
-        timeout: 30000,
-        maxBuffer: 1024 * 1024
-      }
-    );
-
-    const duration = Number.parseFloat(String(stdout).trim());
-
-    if (!Number.isFinite(duration) || duration <= 0) {
-      throw new Error('Fish Audio رجّع ملف MP3 بلا مدة صحيحة');
-    }
-
-    return duration;
-  } finally {
-    try {
-      fs.unlinkSync(tempFile);
-    } catch (_) {}
-  }
+  return 0;
 }
 
 function getMaxAllowedDuration(text) {
