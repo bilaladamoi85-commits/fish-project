@@ -721,12 +721,145 @@ async function previewVoice(id, button) {
     });
 }
 
+
+function getVoiceProfessionalScore(v) {
+  const text = [
+    v?.title,
+    v?.name,
+    v?.nickname,
+    v?.description,
+    v?.tags,
+    v?.labels,
+    v?.category,
+    v?.categories,
+    v?.style,
+    v?.styles
+  ]
+    .flat()
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const weights = {
+    professional: 14,
+    cinematic: 13,
+    dramatic: 11,
+    authoritative: 10,
+    expressive: 10,
+    narration: 9,
+    storytelling: 9,
+    narrator: 9,
+    voiceover: 9,
+    broadcast: 9,
+    commercial: 9,
+    clear: 8,
+    natural: 8,
+    fluent: 8,
+    smooth: 7,
+    deep: 6,
+    energetic: 6,
+    serious: 5,
+    calm: 4,
+    friendly: 4
+  };
+
+  let score = 35;
+  const matched = new Set();
+
+  for (const [keyword, weight] of Object.entries(weights)) {
+    const re = new RegExp(
+      `(^|[^a-z])${keyword}(?=$|[^a-z])`,
+      "i"
+    );
+
+    if (re.test(text) && !matched.has(keyword)) {
+      matched.add(keyword);
+      score += weight;
+    }
+  }
+
+  if (String(v?.description || "").trim().length >= 80) {
+    score += 4;
+  }
+
+  if (
+    Array.isArray(v?.samples) &&
+    v.samples.length > 0
+  ) {
+    score += 4;
+  }
+
+  if (
+    v?.author &&
+    (v.author.nickname || v.author._id)
+  ) {
+    score += 3;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function getVoiceProfessionalBadge(score) {
+  if (score >= 80) {
+    return {
+      icon: "⭐",
+      label: "Premium",
+      className: "premium"
+    };
+  }
+
+  if (score >= 60) {
+    return {
+      icon: "🎙️",
+      label: "Professional",
+      className: "professional"
+    };
+  }
+
+  return {
+    icon: "",
+    label: "",
+    className: "standard"
+  };
+}
+
 function renderVoiceSearchResults() {
 
   if (!document.getElementById("professionalVoiceTagsStyle")) {
     const style = document.createElement("style");
     style.id = "professionalVoiceTagsStyle";
     style.textContent = `
+
+      .voice-professional-score {
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        margin-top:6px;
+        padding:4px 8px;
+        border-radius:999px;
+        font-size:10px;
+        line-height:1;
+        font-weight:800;
+        white-space:nowrap;
+        width:max-content;
+        border:1px solid rgba(255,255,255,.10);
+        background:rgba(255,255,255,.045);
+      }
+
+      .voice-professional-score.premium {
+        background:rgba(255,196,0,.10);
+        border-color:rgba(255,196,0,.28);
+      }
+
+      .voice-professional-score.professional {
+        background:rgba(80,170,255,.10);
+        border-color:rgba(80,170,255,.25);
+      }
+
+      .voice-professional-score.standard {
+        opacity:.72;
+      }
+
       .voice-card-tags {
         display:flex;
         flex-wrap:wrap;
@@ -849,9 +982,11 @@ function renderVoiceSearchResults() {
   });
 
   const select = document.getElementById("voiceSelect");
-  const selectedId = select
-    ? String(select.value || "")
-    : "";
+  const selectedId = String(
+    localStorage.getItem("fish.voiceId") ||
+    (select && select.value) ||
+    ""
+  );
 
   if (count) {
     count.textContent = `${matches.length} voices`;
@@ -878,6 +1013,28 @@ function renderVoiceSearchResults() {
     const country = voiceCountry(v);
     const gender = voiceGender(v);
     const styles = voiceStyles(v);
+
+    const professionalScore =
+      getVoiceProfessionalScore(v);
+
+    const professionalBadge =
+      getVoiceProfessionalBadge(professionalScore);
+
+    const professionalScoreHtml =
+      professionalBadge.label
+        ? `
+          <div class="voice-professional-score ${professionalBadge.className}">
+            <span>${professionalBadge.icon}</span>
+            <span>${professionalBadge.label}</span>
+            <span>·</span>
+            <span>${professionalScore}/100</span>
+          </div>
+        `
+        : `
+          <div class="voice-professional-score standard">
+            <span>${professionalScore}/100</span>
+          </div>
+        `;
 
     const languageNames = {
       en: "English",
@@ -1019,6 +1176,8 @@ function renderVoiceSearchResults() {
               }
             </div>
 
+            ${professionalScoreHtml}
+
             <div class="voice-card-tags">
               ${tagsHtml}
             </div>
@@ -1141,6 +1300,97 @@ function renderVoiceSearchResults() {
   // =========================
   // SELECT
   // =========================
+
+  const finalizeVoiceSelection = id => {
+    if (!id) return false;
+
+    const select = document.getElementById("voiceSelect");
+    if (!select) return false;
+
+    const v = voices.find(x => String(x.id) === String(id));
+    if (!v) return false;
+
+    let option = [...select.options].find(
+      o => String(o.value) === String(id)
+    );
+
+    if (!option) {
+      option = new Option(
+        v.title || v.name || v.nickname || "Voice",
+        id
+      );
+      select.add(option);
+    }
+
+    select.value = id;
+
+    localStorage.setItem("fish.voiceId", id);
+
+    renderSelectedVoice();
+    renderVoiceSearchResults();
+
+    const input = document.getElementById("voiceSearch");
+    if (input) {
+      input.value = "";
+      localStorage.removeItem(VOICE_SEARCH_KEY);
+    }
+
+    const searchInput = document.getElementById("voiceSearch");
+    if (searchInput) {
+      searchInput.dispatchEvent(
+        new Event("input", { bubbles: true })
+      );
+    }
+
+    return true;
+  };
+
+  let pendingPremiumVoiceId = "";
+
+  const closePremiumVoiceModal = () => {
+    const modal = document.getElementById("premiumVoiceModal");
+
+    if (modal) {
+      modal.style.display = "none";
+    }
+
+    pendingPremiumVoiceId = "";
+  };
+
+  const openPremiumVoiceModal = id => {
+    const modal = document.getElementById("premiumVoiceModal");
+    if (!modal) return false;
+
+    const v = voices.find(x => String(x.id) === String(id));
+    if (!v) return false;
+
+    pendingPremiumVoiceId = String(id);
+
+    const title =
+      v.title ||
+      v.name ||
+      v.nickname ||
+      "Premium Voice";
+
+    const titleEl = document.getElementById("premiumVoiceTitle");
+    const messageEl = document.getElementById("premiumVoiceMessage");
+
+    if (titleEl) {
+      titleEl.textContent = `⭐ ${title}`;
+    }
+
+    if (messageEl) {
+      messageEl.textContent =
+        "هذه الشخصية Premium. يمكنك مشاهدة إعلان قصير لدعم بقاء Speakoro مجانيًا، ثم المتابعة لاستخدام الصوت.";
+    }
+
+    modal.style.display = "flex";
+
+    return true;
+  };
+
+  window.closePremiumVoiceModal = closePremiumVoiceModal;
+
   box.querySelectorAll("[data-voice-select]").forEach(btn => {
     btn.addEventListener("click", e => {
       e.preventDefault();
@@ -1149,63 +1399,107 @@ function renderVoiceSearchResults() {
       const id = btn.getAttribute("data-voice-select");
       if (!id) return;
 
-      const searchInput = document.getElementById("voiceSearch");
-      if (searchInput) {
-        searchInput.value = "";
-        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
-        localStorage.removeItem(VOICE_SEARCH_KEY);
+      const v = voices.find(x => String(x.id) === String(id));
+      if (!v) return;
+
+      const score = getVoiceProfessionalScore(v);
+      const badge = getVoiceProfessionalBadge(score);
+
+      // Premium voices require the Premium confirmation modal.
+      if (badge.className === "premium") {
+        openPremiumVoiceModal(id);
+        return;
       }
 
-      const select = document.getElementById("voiceSelect");
-      if (!select) return;
+      finalizeVoiceSelection(id);
+    });
+  });
 
-      const v = voices.find(x => String(x.id) === String(id));
+  // Premium modal controls.
+  const premiumClose =
+    document.getElementById("premiumVoiceClose");
 
-      let option = [...select.options].find(
-        o => String(o.value) === String(id)
+  const premiumContinue =
+    document.getElementById("premiumVoiceContinueBtn");
+
+  const premiumAd =
+    document.getElementById("premiumVoiceAdBtn");
+
+  if (premiumClose) {
+    premiumClose.onclick = () => {
+      closePremiumVoiceModal();
+    };
+  }
+
+  if (premiumContinue) {
+    premiumContinue.onclick = () => {
+      const id = pendingPremiumVoiceId;
+
+      closePremiumVoiceModal();
+
+      // User can continue without an ad.
+      if (id) {
+        finalizeVoiceSelection(id);
+      }
+    };
+  }
+
+  if (premiumAd) {
+    premiumAd.onclick = () => {
+      const id = pendingPremiumVoiceId;
+
+      if (!id) {
+        closePremiumVoiceModal();
+        return;
+      }
+
+      sessionStorage.setItem(
+        "speakoro_pending_premium_voice",
+        id
       );
 
-      if (!option && v) {
-        option = new Option(
-          v.title || v.name || v.nickname || "Voice",
-          id
-        );
-        select.add(option);
+      sessionStorage.setItem(
+        "speakoro_premium_return",
+        "1"
+      );
+
+      window.location.href = SPEAKORO_SMARTLINK;
+    };
+  }
+
+  const premiumModal =
+    document.getElementById("premiumVoiceModal");
+
+  if (premiumModal) {
+    premiumModal.onclick = e => {
+      if (e.target === premiumModal) {
+        closePremiumVoiceModal();
       }
+    };
+  }
 
-      select.value = id;
-      localStorage.setItem("fish.voiceId", id);
+  // Restore Premium selection after returning from the ad.
+  window.addEventListener("pageshow", () => {
+    const pendingId = sessionStorage.getItem(
+      "speakoro_pending_premium_voice"
+    );
 
-      renderSelectedVoice();
+    const returned =
+      sessionStorage.getItem("speakoro_premium_return");
 
-      // مسح البحث فقط
-      const input = document.getElementById("voiceSearch");
-      if (input) input.value = "";
+    if (pendingId && returned === "1") {
+      sessionStorage.removeItem(
+        "speakoro_pending_premium_voice"
+      );
 
-      // إخفاء نتائج البحث
-      box.innerHTML = "";
-      box.style.display = "none";
+      sessionStorage.removeItem(
+        "speakoro_premium_return"
+      );
 
-      // إرجاع الواجهة للمكان ديال الصوت المختار
       setTimeout(() => {
-        const selected = document.querySelector(".selected-voice-card");
-
-        if (selected) {
-          selected.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-          });
-        } else {
-          const selectedVoice = document.getElementById("selectedVoice");
-          if (selectedVoice) {
-            selectedVoice.scrollIntoView({
-              behavior: "smooth",
-              block: "center"
-            });
-          }
-        }
-      }, 100);
-    });
+        finalizeVoiceSelection(pendingId);
+      }, 300);
+    }
   });
 }
 
@@ -1431,6 +1725,16 @@ async function generateSpeech() {
   }
 
   localStorage.setItem("fish.voiceId", voiceId);
+
+  // Keep the selected voice visible after Generate.
+  const selectedSelect = document.getElementById("voiceSelect");
+  if (selectedSelect) {
+    selectedSelect.value = voiceId;
+  }
+
+  renderSelectedVoice();
+  renderVoiceSearchResults();
+
   localStorage.setItem("fish.emotion", selectedEmotion);
   localStorage.setItem("fish.text", text);
 
@@ -1872,13 +2176,13 @@ const SPEAKORO_SMARTLINK =
 const speakoroTranslations = {
   ar: {
     message:
-      "باش نقدّمو ليك هاد الخدمة مجاناً وبأعلى جودة، مصاريف السيرفرات كنوفرلوها بفضل دعمكم ❤️ ساعدنا نستمروا بزيارة رابط إعلاني خفيف. وتقدر تتجاوز المساعدة وتستعمل الخدمة مباشرة. شكراً بزاف على دعمك!",
-    support: "❤️ دعمنا وشاهد الإعلان",
+      "❤️ ساعدنا في إبقاء هذه الخدمة مجانية وعالية الجودة. يمكنك دعمنا بزيارة رابط إعلاني سريع، أو تجاوز هذه الخطوة واستخدام الخدمة مباشرة. شكرًا لدعمك!",
+    support: "❤️ دعمنا ومشاهدة الإعلان",
     skip: "تجاوز المساعدة"
   },
   en: {
     message:
-      "To keep this service free and high quality, server costs are covered thanks to your support ❤️ You can support us by visiting a quick ad link, or skip and use the service directly. Thank you!",
+      "❤️ Help us keep this service free and high quality. You can support us by visiting a quick ad link, or skip this step and use the service directly. Thank you for your support!",
     support: "❤️ Support Us & View Ad",
     skip: "Skip for now"
   }
@@ -1930,15 +2234,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (supportBtn) {
     supportBtn.addEventListener("click", () => {
-      window.open(
-        SPEAKORO_SMARTLINK,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      sessionStorage.setItem("speakoro_pending_generation", "1");
 
-      closeSpeakoroModal();
+      window.location.href = SPEAKORO_SMARTLINK;
     });
   }
+
+  window.addEventListener("pageshow", () => {
+    const pending = sessionStorage.getItem("speakoro_pending_generation");
+
+    if (pending === "1") {
+      sessionStorage.removeItem("speakoro_pending_generation");
+
+      closeSpeakoroModal();
+
+      setTimeout(() => {
+        generateSpeech();
+      }, 250);
+    }
+  });
 
   if (skipBtn) {
     skipBtn.addEventListener("click", () => {
