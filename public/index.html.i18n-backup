@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Speakoro</title>
+<title>SpeakOra</title>
 <link rel="stylesheet" href="styles.css">
 
 <style>
@@ -210,7 +210,7 @@ button.refresh-voices {
 <div class="container">
 
 <header class="hero">
-  <h1>🎤 Speakoro</h1>
+  <h1>🎤 SpeakOra</h1>
   <p>Transform text into emotional speech using Voice Studio API</p>
   <div id="healthStatus" class="status">Loading...</div>
 </header>

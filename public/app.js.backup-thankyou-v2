@@ -1284,24 +1284,7 @@ function renderVoiceSearchResults() {
 
       if (!id) return;
 
-      const v = voices.find(x => String(x.id) === String(id));
-                          if (!v) return;
-
-                          const score = getVoiceProfessionalScore(v);
-                          const badge = getVoiceProfessionalBadge(score);
-
-                          // Premium Save = same Premium dialog as Select
-                          if (badge.className === "premium") {
-                            sessionStorage.setItem(
-                              "speakora_premium_save_voice",
-                              String(id)
-                            );
-
-                            openPremiumVoiceModal(id);
-                            return;
-                          }
-
-                          rememberRecentVoice(id);
+      rememberRecentVoice(id);
       renderRecentVoices();
 
       btn.textContent = "✓";
@@ -1318,35 +1301,32 @@ function renderVoiceSearchResults() {
   // SELECT
   // =========================
 
-  const finalizeVoiceSelection = (id, preserveSearch = false) => {
-  if (!id) return false;
+  const finalizeVoiceSelection = id => {
+    if (!id) return false;
 
-  const select = document.getElementById("voiceSelect");
-  if (!select) return false;
+    const select = document.getElementById("voiceSelect");
+    if (!select) return false;
 
-  const v = voices.find(x => String(x.id) === String(id));
-  if (!v) return false;
+    const v = voices.find(x => String(x.id) === String(id));
+    if (!v) return false;
 
-  let option = [...select.options].find(
-    o => String(o.value) === String(id)
-  );
-
-  if (!option) {
-    option = new Option(
-      v.title || v.name || v.nickname || "Voice",
-      id
+    let option = [...select.options].find(
+      o => String(o.value) === String(id)
     );
-    select.add(option);
-  }
 
-  select.value = id;
-  localStorage.setItem("fish.voiceId", id);
+    if (!option) {
+      option = new Option(
+        v.title || v.name || v.nickname || "Voice",
+        id
+      );
+      select.add(option);
+    }
 
-  renderSelectedVoice();
+    select.value = id;
 
-  // Normal voice selection clears search/filter state.
-  // Saved voice selection keeps the current search/filter state.
-  if (!preserveSearch) {
+    localStorage.setItem("fish.voiceId", id);
+
+    renderSelectedVoice();
     renderVoiceSearchResults();
 
     const input = document.getElementById("voiceSearch");
@@ -1355,14 +1335,19 @@ function renderVoiceSearchResults() {
       localStorage.removeItem(VOICE_SEARCH_KEY);
     }
 
+    // Clear search filters.
+    const languageFilter =
       document.getElementById("voiceLanguageFilter");
+    const genderFilter =
       document.getElementById("voiceGenderSelect");
+    const categoryFilter =
       document.getElementById("voiceCategoryFilter");
 
     if (languageFilter) languageFilter.value = "";
     if (genderFilter) genderFilter.value = "";
     if (categoryFilter) categoryFilter.value = "";
 
+    // Hide old search results.
     const resultsBox =
       document.getElementById("voiceSearchResultsBox");
     const resultCount =
@@ -1376,15 +1361,18 @@ function renderVoiceSearchResults() {
     if (resultCount) {
       resultCount.textContent = "";
     }
-  }
 
-  renderSelectedVoice();
-  renderRecentVoices();
+    renderSelectedVoice();
+    renderRecentVoices();
 
-  return true;
-};
+    // Do NOT trigger the voice-search input event here.
+    // That event calls loadVoices(true), which temporarily clears
+    // the selected voice from the main select.
 
-let pendingPremiumVoiceId = "";
+    return true;
+  };
+
+  let pendingPremiumVoiceId = "";
 
   const closePremiumVoiceModal = () => {
     const modal = document.getElementById("premiumVoiceModal");
@@ -1400,10 +1388,7 @@ let pendingPremiumVoiceId = "";
     const modal = document.getElementById("premiumVoiceModal");
     if (!modal) return false;
 
-    const v =
-      voices.find(x => String(x.id) === String(id)) ||
-      getRecentVoices().find(x => String(x.id) === String(id));
-
+    const v = voices.find(x => String(x.id) === String(id));
     if (!v) return false;
 
     pendingPremiumVoiceId = String(id);
@@ -1423,7 +1408,7 @@ let pendingPremiumVoiceId = "";
 
     if (messageEl) {
       messageEl.textContent =
-        "هذه الشخصية Premium. يمكنك مشاهدة إعلان قصير لدعم بقاء SpeakOra مجانيًا، ثم المتابعة لاستخدام الصوت.";
+        "هذه الشخصية Premium. يمكنك مشاهدة إعلان قصير لدعم بقاء Speakoro مجانيًا، ثم المتابعة لاستخدام الصوت.";
     }
 
     modal.style.display = "flex";
@@ -1474,12 +1459,15 @@ let pendingPremiumVoiceId = "";
   }
 
   if (premiumContinue) {
-    premiumContinue.onclick = e => {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
+    premiumContinue.onclick = () => {
+      const id = pendingPremiumVoiceId;
+
+      closePremiumVoiceModal();
+
+      // User can continue without an ad.
+      if (id) {
+        finalizeVoiceSelection(id);
       }
-      return false;
     };
   }
 
@@ -1493,16 +1481,16 @@ let pendingPremiumVoiceId = "";
       }
 
       sessionStorage.setItem(
-        "speakora_pending_premium_voice",
+        "speakoro_pending_premium_voice",
         id
       );
 
       sessionStorage.setItem(
-        "speakora_premium_return",
+        "speakoro_premium_return",
         "1"
       );
 
-      window.location.href = SPEAKORA_SMARTLINK;
+      window.location.href = SPEAKORO_SMARTLINK;
     };
   }
 
@@ -1520,55 +1508,23 @@ let pendingPremiumVoiceId = "";
   // Restore Premium selection after returning from the ad.
   window.addEventListener("pageshow", () => {
     const pendingId = sessionStorage.getItem(
-      "speakora_pending_premium_voice"
+      "speakoro_pending_premium_voice"
     );
 
     const returned =
-      sessionStorage.getItem("speakora_premium_return");
-
-    const fromSaved =
-      sessionStorage.getItem(
-        "speakora_premium_from_saved"
-      ) === "1";
-
-    const savedPremiumId =
-      sessionStorage.getItem(
-        "speakora_premium_save_voice"
-      );
+      sessionStorage.getItem("speakoro_premium_return");
 
     if (pendingId && returned === "1") {
       sessionStorage.removeItem(
-        "speakora_pending_premium_voice"
+        "speakoro_pending_premium_voice"
       );
 
       sessionStorage.removeItem(
-        "speakora_premium_return"
-      );
-
-      sessionStorage.removeItem(
-        "speakora_premium_from_saved"
-      );
-
-      sessionStorage.removeItem(
-        "speakora_premium_save_voice"
+        "speakoro_premium_return"
       );
 
       setTimeout(() => {
-        showSpeakOraThankYou(() => {
-
-          if (
-            savedPremiumId &&
-            String(savedPremiumId) === String(pendingId)
-          ) {
-            rememberRecentVoice(pendingId);
-            renderRecentVoices();
-          }
-
-          finalizeVoiceSelection(
-            pendingId,
-            fromSaved
-          );
-        });
+        finalizeVoiceSelection(pendingId);
       }, 300);
     }
   });
@@ -1576,22 +1532,22 @@ let pendingPremiumVoiceId = "";
 
 
 /* ================================
-   SpeakOra Thank You After Ad
+   Speakoro Thank You After Ad
    ================================ */
 
-function showSpeakOraThankYou(onClose) {
-  let modal = document.getElementById("speakoraThankYouModal");
+function showSpeakoroThankYou(onClose) {
+  let modal = document.getElementById("speakoroThankYouModal");
 
   if (!modal) {
     modal = document.createElement("div");
-    modal.id = "speakoraThankYouModal";
+    modal.id = "speakoroThankYouModal";
 
     modal.innerHTML = `
-      <div class="speakora-thankyou-card" dir="rtl">
-        <div class="speakora-thankyou-icon">❤️</div>
+      <div class="speakoro-thankyou-card" dir="rtl">
+        <div class="speakoro-thankyou-icon">❤️</div>
         <h2>شكرًا لك!</h2>
-        <p>شكرًا لمشاهدتك الإعلان ودعمك لـ SpeakOra.</p>
-        <button type="button" id="speakoraThankYouClose">
+        <p>شكرًا لمشاهدتك الإعلان ودعمك لـ Speakoro.</p>
+        <button type="button" id="speakoroThankYouClose">
           إغلاق
         </button>
       </div>
@@ -1600,9 +1556,9 @@ function showSpeakOraThankYou(onClose) {
     document.body.appendChild(modal);
 
     const style = document.createElement("style");
-    style.id = "speakoraThankYouStyle";
+    style.id = "speakoroThankYouStyle";
     style.textContent = `
-      #speakoraThankYouModal {
+      #speakoroThankYouModal {
         position: fixed;
         inset: 0;
         z-index: 1000000;
@@ -1616,7 +1572,7 @@ function showSpeakOraThankYou(onClose) {
         -webkit-backdrop-filter: blur(5px);
       }
 
-      .speakora-thankyou-card {
+      .speakoro-thankyou-card {
         width: min(400px, calc(100vw - 36px));
         box-sizing: border-box;
         padding: 30px 22px 22px;
@@ -1628,7 +1584,7 @@ function showSpeakOraThankYou(onClose) {
         border: 1px solid rgba(0,0,0,.08);
       }
 
-      .speakora-thankyou-icon {
+      .speakoro-thankyou-icon {
         width: 68px;
         height: 68px;
         margin: 0 auto 14px;
@@ -1640,14 +1596,14 @@ function showSpeakOraThankYou(onClose) {
         font-size: 34px;
       }
 
-      .speakora-thankyou-card h2 {
+      .speakoro-thankyou-card h2 {
         margin: 0 0 9px;
         font-size: 23px;
         font-weight: 900;
         color: #171717;
       }
 
-      .speakora-thankyou-card p {
+      .speakoro-thankyou-card p {
         margin: 0 auto 22px;
         max-width: 320px;
         color: #666;
@@ -1655,7 +1611,7 @@ function showSpeakOraThankYou(onClose) {
         line-height: 1.8;
       }
 
-      #speakoraThankYouClose {
+      #speakoroThankYouClose {
         width: 100%;
         min-height: 50px;
         border: 0;
@@ -1667,7 +1623,7 @@ function showSpeakOraThankYou(onClose) {
         cursor: pointer;
       }
 
-      #speakoraThankYouClose:active {
+      #speakoroThankYouClose:active {
         transform: scale(.99);
       }
     `;
@@ -1677,7 +1633,7 @@ function showSpeakOraThankYou(onClose) {
 
   modal.style.display = "flex";
 
-  const closeBtn = document.getElementById("speakoraThankYouClose");
+  const closeBtn = document.getElementById("speakoroThankYouClose");
 
   if (closeBtn) {
     closeBtn.onclick = () => {
@@ -1691,7 +1647,7 @@ function showSpeakOraThankYou(onClose) {
 }
 
 /* ================================
-   End SpeakOra Thank You After Ad
+   End Speakoro Thank You After Ad
    ================================ */
 
 /* ===== Recent Voices ===== */
@@ -1838,96 +1794,29 @@ function renderRecentVoices() {
         select.add(option);
       }
 
-      const liveVoice =
-        voices.find(v => String(v.id) === String(saved.id)) || null;
+      // Change the actual selected voice.
+      select.value = saved.id;
+      localStorage.setItem("fish.voiceId", saved.id);
 
-      const savedIsPremium =
-        saved.isPremium === true ||
-        saved.premium === true ||
-        !!(
-          liveVoice &&
-          getVoiceProfessionalBadge(
-            getVoiceProfessionalScore(liveVoice)
-          ).className === "premium"
-        );
+    if (typeof showVoiceInfo === "function") {
+      showVoiceInfo();
+    }
 
+    if (typeof renderSelectedVoice === "function") {
+      renderSelectedVoice();
+    }
+
+      // Update only the saved-voices visual state.
       box.querySelectorAll(".recent-voice-item")
-        .forEach(item =>
-          item.classList.remove("recent-voice-selected")
-        );
+        .forEach(item => item.classList.remove("recent-voice-selected"));
 
       const item = btn.closest(".recent-voice-item");
       if (item) item.classList.add("recent-voice-selected");
 
-      /*
-       * SAVED PREMIUM VOICE:
-       * Use EXACTLY the same Premium dialog as normal voice selection.
-       */
-      if (savedIsPremium) {
-        if (liveVoice) {
-          openPremiumVoiceModal(saved.id);
-        }
-        return;
-      }
-
-      /*
-       * SAVED NORMAL VOICE:
-       * Select normally, but clear the search/results first.
-       */
-      const input = document.getElementById("voiceSearch");
-      if (input) input.value = "";
-
-      localStorage.removeItem(VOICE_SEARCH_KEY);
-
-        document.getElementById("voiceLanguageFilter");
-        document.getElementById("voiceGenderSelect");
-        document.getElementById("voiceCategoryFilter");
-
-      if (languageFilter) languageFilter.value = "";
-      if (genderFilter) genderFilter.value = "";
-      if (categoryFilter) categoryFilter.value = "";
-
-        document.getElementById("voiceSearchResultsBox");
-        document.getElementById("voiceResultCount");
-
-      if (resultsBox) {
-        resultsBox.innerHTML = "";
-        resultsBox.style.display = "none";
-      }
-
-      if (resultCount) resultCount.textContent = "";
-
-      // Selecting a saved voice clears the active search/results.
-    const searchInput = document.getElementById("voiceSearch");
-    if (searchInput) {
-      searchInput.value = "";
-    }
-
-    localStorage.removeItem(VOICE_SEARCH_KEY);
-
-      document.getElementById("voiceLanguageFilter");
-      document.getElementById("voiceGenderSelect");
-      document.getElementById("voiceCategoryFilter");
-
-    if (languageFilter) languageFilter.value = "";
-    if (genderFilter) genderFilter.value = "";
-    if (categoryFilter) categoryFilter.value = "";
-
-      document.getElementById("voiceSearchResultsBox");
-      document.getElementById("voiceResultCount");
-
-    if (resultsBox) {
-      resultsBox.innerHTML = "";
-      resultsBox.style.display = "none";
-    }
-
-    if (resultCount) {
-      resultCount.textContent = "";
-    }
-
-    renderVoiceSearchResults();
-
-    finalizeVoiceSelection(saved.id);
+      // Keep the normal app selection logic working.
+      select.dispatchEvent(
+        new Event("change", { bubbles: true })
+      );
     };
   });
 }
@@ -2363,24 +2252,11 @@ window.saveVoiceManual = function(e, id, name, lang, audio) {
     saved.splice(index, 1);
     alert('Removed "' + name + '" from saved voices');
   } else {
-    const savedVoice = voices.find(
-      v => String(v.id) === String(id)
-    );
-
-    const isPremium =
-      !!(
-        savedVoice &&
-        getVoiceProfessionalBadge(
-          getVoiceProfessionalScore(savedVoice)
-        ).className === "premium"
-      );
-
     saved.unshift({
       id: id || name,
       name: name,
       lang: lang || 'ar',
       audio: audio || '',
-      isPremium: isPremium,
       date: new Date().toISOString()
     });
     alert('Saved "' + name + '" to saved voices successfully!');
@@ -2417,24 +2293,11 @@ window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
     saved.splice(index, 1);
     alert('Removed "' + voiceName + '" from saved voices');
   } else {
-    const savedVoice = voices.find(
-      v => String(v.id) === String(voiceId)
-    );
-
-    const isPremium =
-      !!(
-        savedVoice &&
-        getVoiceProfessionalBadge(
-          getVoiceProfessionalScore(savedVoice)
-        ).className === "premium"
-      );
-
     saved.unshift({
       id: voiceId || voiceName,
       name: voiceName,
       lang: lang || 'ar',
       audio: audio || '',
-      isPremium: isPremium,
       savedAt: new Date().toISOString()
     });
     alert('Saved "' + voiceName + '" to saved voices!');
@@ -2451,13 +2314,13 @@ window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
 };
 
 /* ================================
-   SpeakOra Support Modal
+   Speakoro Support Modal
    ================================ */
 
-const SPEAKORA_SMARTLINK =
+const SPEAKORO_SMARTLINK =
   "https://cowardrainbowactual.com/tht44es8sp?key=d7859f1b667778d53c4dfd041aaf0220";
 
-const speakoraTranslations = {
+const speakoroTranslations = {
   ar: {
     message:
       "❤️ ساعدنا في إبقاء هذه الخدمة مجانية وعالية الجودة. يمكنك دعمنا بزيارة رابط إعلاني سريع، أو تجاوز هذه الخطوة واستخدام الخدمة مباشرة. شكرًا لدعمك!",
@@ -2472,12 +2335,12 @@ const speakoraTranslations = {
   }
 };
 
-function getSpeakOraLanguage() {
+function getSpeakoroLanguage() {
   const lang = (navigator.language || navigator.userLanguage || "ar").toLowerCase();
   return lang.startsWith("ar") ? "ar" : "en";
 }
 
-function updateSpeakOraModal() {
+function updateSpeakoroModal() {
   const modal = document.getElementById("adModal");
   const message = document.getElementById("modalMessage");
   const support = document.getElementById("supportBtn");
@@ -2485,8 +2348,8 @@ function updateSpeakOraModal() {
 
   if (!modal || !message || !support || !skip) return;
 
-  const lang = getSpeakOraLanguage();
-  const t = speakoraTranslations[lang];
+  const lang = getSpeakoroLanguage();
+  const t = speakoroTranslations[lang];
 
   modal.dir = lang === "ar" ? "rtl" : "ltr";
   message.textContent = t.message;
@@ -2502,11 +2365,11 @@ function showAdModal() {
     return;
   }
 
-  updateSpeakOraModal();
+  updateSpeakoroModal();
   modal.style.display = "flex";
 }
 
-function closeSpeakOraModal() {
+function closeSpeakoroModal() {
   const modal = document.getElementById("adModal");
   if (modal) modal.style.display = "none";
 }
@@ -2518,31 +2381,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (supportBtn) {
     supportBtn.addEventListener("click", () => {
-      sessionStorage.setItem("speakora_pending_generation", "1");
+      sessionStorage.setItem("speakoro_pending_generation", "1");
 
-      window.location.href = SPEAKORA_SMARTLINK;
+      window.location.href = SPEAKORO_SMARTLINK;
     });
   }
 
   window.addEventListener("pageshow", () => {
-    const pending = sessionStorage.getItem("speakora_pending_generation");
+    const pending = sessionStorage.getItem("speakoro_pending_generation");
 
     if (pending === "1") {
-      sessionStorage.removeItem("speakora_pending_generation");
+      sessionStorage.removeItem("speakoro_pending_generation");
 
-      closeSpeakOraModal();
+      closeSpeakoroModal();
 
       setTimeout(() => {
-        showSpeakOraThankYou(() => {
-          generateSpeech();
-        });
+        generateSpeech();
       }, 250);
     }
   });
 
   if (skipBtn) {
     skipBtn.addEventListener("click", () => {
-      closeSpeakOraModal();
+      closeSpeakoroModal();
       generateSpeech();
     });
   }
@@ -2550,7 +2411,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (modal) {
     modal.addEventListener("click", (e) => {
       if (e.target === modal) {
-        closeSpeakOraModal();
+        closeSpeakoroModal();
       }
     });
   }

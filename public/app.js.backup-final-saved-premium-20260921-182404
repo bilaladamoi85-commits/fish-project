@@ -1284,24 +1284,7 @@ function renderVoiceSearchResults() {
 
       if (!id) return;
 
-      const v = voices.find(x => String(x.id) === String(id));
-                          if (!v) return;
-
-                          const score = getVoiceProfessionalScore(v);
-                          const badge = getVoiceProfessionalBadge(score);
-
-                          // Premium Save = same Premium dialog as Select
-                          if (badge.className === "premium") {
-                            sessionStorage.setItem(
-                              "speakora_premium_save_voice",
-                              String(id)
-                            );
-
-                            openPremiumVoiceModal(id);
-                            return;
-                          }
-
-                          rememberRecentVoice(id);
+      rememberRecentVoice(id);
       renderRecentVoices();
 
       btn.textContent = "✓";
@@ -1355,8 +1338,11 @@ function renderVoiceSearchResults() {
       localStorage.removeItem(VOICE_SEARCH_KEY);
     }
 
+    const languageFilter =
       document.getElementById("voiceLanguageFilter");
+    const genderFilter =
       document.getElementById("voiceGenderSelect");
+    const categoryFilter =
       document.getElementById("voiceCategoryFilter");
 
     if (languageFilter) languageFilter.value = "";
@@ -1400,10 +1386,7 @@ let pendingPremiumVoiceId = "";
     const modal = document.getElementById("premiumVoiceModal");
     if (!modal) return false;
 
-    const v =
-      voices.find(x => String(x.id) === String(id)) ||
-      getRecentVoices().find(x => String(x.id) === String(id));
-
+    const v = voices.find(x => String(x.id) === String(id));
     if (!v) return false;
 
     pendingPremiumVoiceId = String(id);
@@ -1474,12 +1457,15 @@ let pendingPremiumVoiceId = "";
   }
 
   if (premiumContinue) {
-    premiumContinue.onclick = e => {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
+    premiumContinue.onclick = () => {
+      const id = pendingPremiumVoiceId;
+
+      closePremiumVoiceModal();
+
+      // User can continue without an ad.
+      if (id) {
+        finalizeVoiceSelection(id);
       }
-      return false;
     };
   }
 
@@ -1526,16 +1512,6 @@ let pendingPremiumVoiceId = "";
     const returned =
       sessionStorage.getItem("speakora_premium_return");
 
-    const fromSaved =
-      sessionStorage.getItem(
-        "speakora_premium_from_saved"
-      ) === "1";
-
-    const savedPremiumId =
-      sessionStorage.getItem(
-        "speakora_premium_save_voice"
-      );
-
     if (pendingId && returned === "1") {
       sessionStorage.removeItem(
         "speakora_pending_premium_voice"
@@ -1545,29 +1521,9 @@ let pendingPremiumVoiceId = "";
         "speakora_premium_return"
       );
 
-      sessionStorage.removeItem(
-        "speakora_premium_from_saved"
-      );
-
-      sessionStorage.removeItem(
-        "speakora_premium_save_voice"
-      );
-
       setTimeout(() => {
         showSpeakOraThankYou(() => {
-
-          if (
-            savedPremiumId &&
-            String(savedPremiumId) === String(pendingId)
-          ) {
-            rememberRecentVoice(pendingId);
-            renderRecentVoices();
-          }
-
-          finalizeVoiceSelection(
-            pendingId,
-            fromSaved
-          );
+          finalizeVoiceSelection(pendingId);
         });
       }, 300);
     }
@@ -1838,96 +1794,41 @@ function renderRecentVoices() {
         select.add(option);
       }
 
-      const liveVoice =
-        voices.find(v => String(v.id) === String(saved.id)) || null;
+      // Saved voices preserve the current search/filter state.
+    // Premium saved voices still require the Premium ad.
 
-      const savedIsPremium =
-        saved.isPremium === true ||
-        saved.premium === true ||
-        !!(
-          liveVoice &&
-          getVoiceProfessionalBadge(
-            getVoiceProfessionalScore(liveVoice)
-          ).className === "premium"
-        );
+    const liveVoice =
+      voices.find(v => String(v.id) === String(saved.id)) || null;
 
-      box.querySelectorAll(".recent-voice-item")
-        .forEach(item =>
-          item.classList.remove("recent-voice-selected")
-        );
+    const savedIsPremium =
+      saved.isPremium === true ||
+      saved.premium === true ||
+      !!(
+        liveVoice &&
+        getVoiceProfessionalBadge(
+          getVoiceProfessionalScore(liveVoice)
+        ).className === "premium"
+      );
 
-      const item = btn.closest(".recent-voice-item");
-      if (item) item.classList.add("recent-voice-selected");
+    // Update only the saved-voices visual state.
+    box.querySelectorAll(".recent-voice-item")
+      .forEach(item =>
+        item.classList.remove("recent-voice-selected")
+      );
 
-      /*
-       * SAVED PREMIUM VOICE:
-       * Use EXACTLY the same Premium dialog as normal voice selection.
-       */
-      if (savedIsPremium) {
-        if (liveVoice) {
-          openPremiumVoiceModal(saved.id);
-        }
-        return;
+    const item = btn.closest(".recent-voice-item");
+    if (item) item.classList.add("recent-voice-selected");
+
+    if (savedIsPremium) {
+      // Premium saved voice -> show the same Premium ad.
+      if (liveVoice) {
+        openPremiumVoiceModal(saved.id);
       }
-
-      /*
-       * SAVED NORMAL VOICE:
-       * Select normally, but clear the search/results first.
-       */
-      const input = document.getElementById("voiceSearch");
-      if (input) input.value = "";
-
-      localStorage.removeItem(VOICE_SEARCH_KEY);
-
-        document.getElementById("voiceLanguageFilter");
-        document.getElementById("voiceGenderSelect");
-        document.getElementById("voiceCategoryFilter");
-
-      if (languageFilter) languageFilter.value = "";
-      if (genderFilter) genderFilter.value = "";
-      if (categoryFilter) categoryFilter.value = "";
-
-        document.getElementById("voiceSearchResultsBox");
-        document.getElementById("voiceResultCount");
-
-      if (resultsBox) {
-        resultsBox.innerHTML = "";
-        resultsBox.style.display = "none";
-      }
-
-      if (resultCount) resultCount.textContent = "";
-
-      // Selecting a saved voice clears the active search/results.
-    const searchInput = document.getElementById("voiceSearch");
-    if (searchInput) {
-      searchInput.value = "";
+      return;
     }
 
-    localStorage.removeItem(VOICE_SEARCH_KEY);
-
-      document.getElementById("voiceLanguageFilter");
-      document.getElementById("voiceGenderSelect");
-      document.getElementById("voiceCategoryFilter");
-
-    if (languageFilter) languageFilter.value = "";
-    if (genderFilter) genderFilter.value = "";
-    if (categoryFilter) categoryFilter.value = "";
-
-      document.getElementById("voiceSearchResultsBox");
-      document.getElementById("voiceResultCount");
-
-    if (resultsBox) {
-      resultsBox.innerHTML = "";
-      resultsBox.style.display = "none";
-    }
-
-    if (resultCount) {
-      resultCount.textContent = "";
-    }
-
-    renderVoiceSearchResults();
-
-    finalizeVoiceSelection(saved.id);
+    // Normal saved voice -> select without clearing search.
+    finalizeVoiceSelection(saved.id, true);
     };
   });
 }
@@ -2363,24 +2264,11 @@ window.saveVoiceManual = function(e, id, name, lang, audio) {
     saved.splice(index, 1);
     alert('Removed "' + name + '" from saved voices');
   } else {
-    const savedVoice = voices.find(
-      v => String(v.id) === String(id)
-    );
-
-    const isPremium =
-      !!(
-        savedVoice &&
-        getVoiceProfessionalBadge(
-          getVoiceProfessionalScore(savedVoice)
-        ).className === "premium"
-      );
-
     saved.unshift({
       id: id || name,
       name: name,
       lang: lang || 'ar',
       audio: audio || '',
-      isPremium: isPremium,
       date: new Date().toISOString()
     });
     alert('Saved "' + name + '" to saved voices successfully!');
@@ -2417,24 +2305,11 @@ window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
     saved.splice(index, 1);
     alert('Removed "' + voiceName + '" from saved voices');
   } else {
-    const savedVoice = voices.find(
-      v => String(v.id) === String(voiceId)
-    );
-
-    const isPremium =
-      !!(
-        savedVoice &&
-        getVoiceProfessionalBadge(
-          getVoiceProfessionalScore(savedVoice)
-        ).className === "premium"
-      );
-
     saved.unshift({
       id: voiceId || voiceName,
       name: voiceName,
       lang: lang || 'ar',
       audio: audio || '',
-      isPremium: isPremium,
       savedAt: new Date().toISOString()
     });
     alert('Saved "' + voiceName + '" to saved voices!');

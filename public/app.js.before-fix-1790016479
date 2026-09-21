@@ -1355,8 +1355,11 @@ function renderVoiceSearchResults() {
       localStorage.removeItem(VOICE_SEARCH_KEY);
     }
 
+    const languageFilter =
       document.getElementById("voiceLanguageFilter");
+    const genderFilter =
       document.getElementById("voiceGenderSelect");
+    const categoryFilter =
       document.getElementById("voiceCategoryFilter");
 
     if (languageFilter) languageFilter.value = "";
@@ -1879,15 +1882,20 @@ function renderRecentVoices() {
 
       localStorage.removeItem(VOICE_SEARCH_KEY);
 
+      const languageFilter =
         document.getElementById("voiceLanguageFilter");
+      const genderFilter =
         document.getElementById("voiceGenderSelect");
+      const categoryFilter =
         document.getElementById("voiceCategoryFilter");
 
       if (languageFilter) languageFilter.value = "";
       if (genderFilter) genderFilter.value = "";
       if (categoryFilter) categoryFilter.value = "";
 
+      const resultsBox =
         document.getElementById("voiceSearchResultsBox");
+      const resultCount =
         document.getElementById("voiceResultCount");
 
       if (resultsBox) {
@@ -1905,15 +1913,20 @@ function renderRecentVoices() {
 
     localStorage.removeItem(VOICE_SEARCH_KEY);
 
+    const languageFilter =
       document.getElementById("voiceLanguageFilter");
+    const genderFilter =
       document.getElementById("voiceGenderSelect");
+    const categoryFilter =
       document.getElementById("voiceCategoryFilter");
 
     if (languageFilter) languageFilter.value = "";
     if (genderFilter) genderFilter.value = "";
     if (categoryFilter) categoryFilter.value = "";
 
+    const resultsBox =
       document.getElementById("voiceSearchResultsBox");
+    const resultCount =
       document.getElementById("voiceResultCount");
 
     if (resultsBox) {

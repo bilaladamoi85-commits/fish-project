@@ -24,9 +24,215 @@ const FISH_MODEL = 's2.1-pro-free';
 const CHUNK_SIZE = 900;
 const PARALLEL = 10;
 
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// ============================================================
+// SpeakOra Security Layer - internal protection, no external service
+// ============================================================
+
+app.disable('x-powered-by');
+
+const SPEAKORA_ALLOWED_ORIGINS = new Set([
+  'https://fish-project-sigma.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001'
+]);
+
+const SPEAKORA_RATE_WINDOW = 60 * 1000;
+const SPEAKORA_RATE_LIMITS = {
+  default: 120,
+  voices: 60,
+  generation: 8,
+  preview: 20,
+  credits: 30,
+  avatar: 60
+};
+
+const speakoraRateStore = new Map();
+
+function speakoraClientIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim();
+
+  return forwarded ||
+    String(req.socket?.remoteAddress || 'unknown');
+}
+
+function speakoraRateLimit(bucket, limit) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const ip = speakoraClientIp(req);
+    const key = `${bucket}:${ip}`;
+
+    let entry = speakoraRateStore.get(key);
+
+    if (!entry || now - entry.startedAt >= SPEAKORA_RATE_WINDOW) {
+      entry = {
+        startedAt: now,
+        count: 0
+      };
+    }
+
+    entry.count += 1;
+    speakoraRateStore.set(key, entry);
+
+    if (entry.count > limit) {
+      const retryAfter =
+        Math.max(
+          1,
+          Math.ceil(
+            (SPEAKORA_RATE_WINDOW - (now - entry.startedAt)) / 1000
+          )
+        );
+
+      res.setHeader('Retry-After', String(retryAfter));
+
+      return res.status(429).json({
+        error: 'Too many requests',
+        message: 'Please try again later.'
+      });
+    }
+
+    next();
+  };
+}
+
+// Remove expired in-memory rate-limit records.
+setInterval(() => {
+  const now = Date.now();
+
+  for (const [key, entry] of speakoraRateStore.entries()) {
+    if (now - entry.startedAt >= SPEAKORA_RATE_WINDOW) {
+      speakoraRateStore.delete(key);
+    }
+  }
+}, SPEAKORA_RATE_WINDOW).unref();
+
+// Security headers.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=()'
+  );
+  res.setHeader(
+    'Cross-Origin-Resource-Policy',
+    'same-origin'
+  );
+
+  next();
+});
+
+// Controlled CORS.
+// Requests without an Origin (for example server-to-server calls) remain
+// possible, while browser cross-origin requests are restricted.
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || SPEAKORA_ALLOWED_ORIGINS.has(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(
+      new Error('CORS origin not allowed')
+    );
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
+  maxAge: 86400
+}));
+
+// Reject obviously invalid API requests before they reach expensive handlers.
+app.use('/api', (req, res, next) => {
+  const contentLength = Number(req.headers['content-length'] || 0);
+
+  if (
+    Number.isFinite(contentLength) &&
+    contentLength > 10 * 1024 * 1024
+  ) {
+    return res.status(413).json({
+      error: 'Request too large'
+    });
+  }
+
+  const userAgent = String(req.headers['user-agent'] || '').trim();
+
+  if (
+    userAgent.length > 500 ||
+    /sqlmap|nikto|masscan|nmap|zgrab|gobuster|dirbuster/i.test(userAgent)
+  ) {
+    return res.status(403).json({
+      error: 'Request blocked'
+    });
+  }
+
+  next();
+});
+
+// General API rate limit.
+app.use(
+  '/api',
+  speakoraRateLimit(
+    'default',
+    SPEAKORA_RATE_LIMITS.default
+  )
+);
+
+// Expensive endpoints receive stricter limits.
+app.use(
+  '/api/tts',
+  speakoraRateLimit(
+    'generation',
+    SPEAKORA_RATE_LIMITS.generation
+  )
+);
+
+app.use(
+  '/api/voice-preview',
+  speakoraRateLimit(
+    'preview',
+    SPEAKORA_RATE_LIMITS.preview
+  )
+);
+
+app.use(
+  '/api/voices',
+  speakoraRateLimit(
+    'voices',
+    SPEAKORA_RATE_LIMITS.voices
+  )
+);
+
+app.use(
+  '/api/credits',
+  speakoraRateLimit(
+    'credits',
+    SPEAKORA_RATE_LIMITS.credits
+  )
+);
+
+app.use(
+  '/api/voice-avatar',
+  speakoraRateLimit(
+    'avatar',
+    SPEAKORA_RATE_LIMITS.avatar
+  )
+);
+
+// JSON body protection.
+app.use(express.json({
+  limit: '2mb',
+  strict: true
+}));
+
+// Static files.
+app.use(express.static(path.join(__dirname, 'public'), {
+  dotfiles: 'deny',
+  index: 'index.html'
+}));
 
 function splitText(text, maxChars = CHUNK_SIZE) {
   const clean = String(text || '')

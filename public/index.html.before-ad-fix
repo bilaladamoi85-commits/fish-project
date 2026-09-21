@@ -234,17 +234,17 @@ button.refresh-voices {
 
   <div class="voice-filters">
     <select id="voiceLanguageFilter" class="voice-filter">
-      <option value="">🌐 أي لغة</option>
+      <option value="">🌐 Any Language</option>
     </select>
 
     <select id="voiceGenderSelect" class="voice-filter">
-      <option value="">⚥ أي جنس</option>
+      <option value="">⚥ Any Gender</option>
       <option value="male">♂ ذكر</option>
       <option value="female">♀ أنثى</option>
     </select>
 
     <select id="voiceCategoryFilter" class="voice-filter">
-      <option value="">🎙️ أي فئة</option>
+      <option value="">🎙️ Any Category</option>
     </select>
   </div>
 
@@ -564,7 +564,7 @@ button.refresh-voices {
     <button class="emotion" data-emotion="emphasis">✨ Emphasis</button>
   </div>
 
-  <button id="generateBtn" class="btn primary" type="button" onclick="generateSpeech()">
+  <button id="generateBtn" class="btn primary" type="button" onclick="showCreateSpeechAd(); generateSpeech()">
     🎙️ Generate Speech
   </button>
 
@@ -724,13 +724,44 @@ button.refresh-voices {
   <span>•</span>
   <a href="/terms">Terms of Service</a>
   <span>•</span>
-  <a href="#contact">Contact</a>
+  <a href="https://mail.google.com/mail/?view=cm&fs=1&to=fatnasaidi307@gmail.com" target="_blank" rel="noopener">Contact</a>
 </footer>
 
 
 <script id="speakora-i18n">
 (() => {
   const translations = {
+    en: {
+      "Search voice by name...": "Search voice by name...",
+      "Write your text here...": "Write your text here...",
+      "Neutral": "Neutral",
+      "Excited": "Excited",
+      "Sad": "Sad",
+      "Angry": "Angry",
+      "Calm": "Calm",
+      "Whispering": "Whispering",
+      "Laughing": "Laughing",
+      "Emphasis": "Emphasis",
+      "Download MP3": "Download MP3",
+      "Copy Audio URL": "Copy Audio URL",
+      "Voice name": "Voice name",
+      "Create Clone": "Create Clone",
+      "Add audio URL": "Add audio URL",
+      "About": "About",
+      "Privacy Policy": "Privacy Policy",
+      "Terms of Service": "Terms of Service",
+      "Contact": "Contact",
+      "Any Language": "Any Language",
+      "Any Gender": "Any Gender",
+      "Any Category": "Any Category",
+      "Voices": "Voices",
+      "Text to Speech": "Text to Speech",
+      "Choose Emotion": "Choose Emotion",
+      "Generate Speech": "Generate Speech",
+      "Single request": "Single request",
+      "Voice Studio connected": "Voice Studio connected"
+    },
+
     ar: {
       "Search voice by name...": "ابحث عن صوت بالاسم...",
       "Write your text here...": "اكتب النص هنا...",
@@ -751,7 +782,15 @@ button.refresh-voices {
       "Privacy Policy": "سياسة الخصوصية",
       "Terms of Service": "شروط الاستخدام",
       "Contact": "تواصل معنا",
-      "SpeakOra": "SpeakOra"
+      "Any Language": "أي لغة",
+      "Any Gender": "أي جنس",
+      "Any Category": "أي فئة",
+      "Voices": "الأصوات",
+      "Text to Speech": "تحويل النص إلى كلام",
+      "Choose Emotion": "اختر المشاعر",
+      "Generate Speech": "توليد الصوت",
+      "Single request": "طلب واحد",
+      "Voice Studio connected": "Voice Studio متصل"
     },
 
     fr: {
@@ -774,7 +813,15 @@ button.refresh-voices {
       "Privacy Policy": "Politique de confidentialité",
       "Terms of Service": "Conditions d’utilisation",
       "Contact": "Contact",
-      "SpeakOra": "SpeakOra"
+      "Any Language": "Toutes les langues",
+      "Any Gender": "Tous les genres",
+      "Any Category": "Toutes les catégories",
+      "Voices": "Voix",
+      "Text to Speech": "Synthèse vocale",
+      "Choose Emotion": "Choisir une émotion",
+      "Generate Speech": "Générer la voix",
+      "Single request": "Requête unique",
+      "Voice Studio connected": "Voice Studio connecté"
     },
 
     es: {
@@ -797,7 +844,15 @@ button.refresh-voices {
       "Privacy Policy": "Política de privacidad",
       "Terms of Service": "Términos de servicio",
       "Contact": "Contacto",
-      "SpeakOra": "SpeakOra"
+      "Any Language": "Cualquier idioma",
+      "Any Gender": "Cualquier género",
+      "Any Category": "Cualquier categoría",
+      "Voices": "Voces",
+      "Text to Speech": "Texto a voz",
+      "Choose Emotion": "Elegir emoción",
+      "Generate Speech": "Generar voz",
+      "Single request": "Solicitud única",
+      "Voice Studio connected": "Voice Studio conectado"
     },
 
     de: {
@@ -820,13 +875,26 @@ button.refresh-voices {
       "Privacy Policy": "Datenschutzerklärung",
       "Terms of Service": "Nutzungsbedingungen",
       "Contact": "Kontakt",
-      "SpeakOra": "SpeakOra"
+      "Any Language": "Jede Sprache",
+      "Any Gender": "Jedes Geschlecht",
+      "Any Category": "Jede Kategorie",
+      "Voices": "Stimmen",
+      "Text to Speech": "Text zu Sprache",
+      "Choose Emotion": "Emotion auswählen",
+      "Generate Speech": "Sprache generieren",
+      "Single request": "Einzelanfrage",
+      "Voice Studio connected": "Voice Studio verbunden"
     }
   };
 
   const deviceLang = (navigator.language || "en").toLowerCase();
-  const lang = Object.keys(translations).find(x => deviceLang === x || deviceLang.startsWith(x + "-")) || "en";
-  const dict = translations[lang] || {};
+
+  const lang =
+    Object.keys(translations).find(
+      x => deviceLang === x || deviceLang.startsWith(x + "-")
+    ) || "en";
+
+  const dict = translations[lang];
 
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
@@ -837,41 +905,51 @@ button.refresh-voices {
     const walker = document.createTreeWalker(
       root,
       NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node) {
-          const parent = node.parentElement;
-          if (!parent) return NodeFilter.FILTER_REJECT;
-          if (["SCRIPT", "STYLE", "NOSCRIPT"].includes(parent.tagName)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
+      null
     );
 
     const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
 
-    for (const node of nodes) {
-      const original = node.nodeValue.trim();
-      if (!original || !dict[original]) continue;
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const parent = node.parentElement;
 
-      const start = node.nodeValue.indexOf(original);
-      node.nodeValue =
-        node.nodeValue.slice(0, start) +
-        dict[original] +
-        node.nodeValue.slice(start + original.length);
+      if (!parent) continue;
+
+      if (
+        ["SCRIPT", "STYLE", "NOSCRIPT"].includes(parent.tagName)
+      ) {
+        continue;
+      }
+
+      nodes.push(node);
     }
 
-    root.querySelectorAll?.("input[placeholder], textarea[placeholder]").forEach(el => {
+    for (const node of nodes) {
+      const text = node.nodeValue;
+
+      for (const [source, target] of Object.entries(dict)) {
+        if (text.includes(source)) {
+          node.nodeValue = node.nodeValue.split(source).join(target);
+        }
+      }
+    }
+
+    root.querySelectorAll?.(
+      "input[placeholder], textarea[placeholder]"
+    ).forEach(el => {
       const value = el.getAttribute("placeholder");
+
       if (value && dict[value]) {
         el.setAttribute("placeholder", dict[value]);
       }
     });
 
-    root.querySelectorAll?.("input[aria-label], button[aria-label]").forEach(el => {
+    root.querySelectorAll?.(
+      "input[aria-label], button[aria-label]"
+    ).forEach(el => {
       const value = el.getAttribute("aria-label");
+
       if (value && dict[value]) {
         el.setAttribute("aria-label", dict[value]);
       }
@@ -905,6 +983,52 @@ button.refresh-voices {
     start();
   }
 })();
+</script>
+
+<!-- ADSTERRA-ADS -->
+
+<!-- ADSTERRA 300x250 -->
+<div style="display:flex;justify-content:center;margin:24px auto;">
+<script>
+  atOptions = {
+    'key' : '508e5f01e39a99b2539ec5e370ab4e28',
+    'format' : 'iframe',
+    'height' : 250,
+    'width' : 300,
+    'params' : {}
+  };
+</script>
+<script src="https://www.highrevenueformat.com/508e5f01e39a99b2539ec5e370ab4e28/invoke.js"></script>
+</div>
+
+<!-- ADSTERRA 320x50 -->
+<div style="display:flex;justify-content:center;margin:24px auto;">
+<script>
+  atOptions = {
+    'key' : '7f970af1ae9650d750c4557bcc7ab300',
+    'format' : 'iframe',
+    'height' : 50,
+    'width' : 320,
+    'params' : {}
+  };
+</script>
+<script src="https://www.highrevenueformat.com/7f970af1ae9650d750c4557bcc7ab300/invoke.js"></script>
+</div>
+
+
+<script>
+function showCreateSpeechAd() {
+  try {
+    if (typeof window.open === "function") {
+      const adWindow = window.open("", "_blank");
+      if (adWindow) {
+        adWindow.location.href = "https://cowardrainbowactual.com/a0/d7/ff/a0d7ff9a7fb59374c74e0675a9d0b708.js";
+      }
+    }
+  } catch (e) {
+    console.log("Ad skipped:", e);
+  }
+}
 </script>
 
 </body>

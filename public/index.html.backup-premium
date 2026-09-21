@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SpeakOra</title>
+<title>Speakoro</title>
 <link rel="stylesheet" href="styles.css">
 
 <style>
@@ -205,12 +205,99 @@ button.refresh-voices {
 }
 </style>
 
+
+<style id="fish-project-modal-style">
+#fish-project-modal-style {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+}
+
+#adModal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(5px);
+}
+
+#adModal .modal-content {
+  width: min(430px, 100%);
+  padding: 24px;
+  border-radius: 20px;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  text-align: center;
+}
+
+#adModal #modalMessage {
+  margin: 0 0 20px;
+  line-height: 1.7;
+  font-size: 16px;
+}
+
+#adModal .modal-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#adModal button {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+#adModal .btn-primary {
+  background: #111827;
+  color: #fff;
+}
+
+#adModal .btn-secondary {
+  background: #e5e7eb;
+  color: #111827;
+}
+</style>
+
 </head>
 <body>
+<!-- SPEAKORO TOP AD -->
+<div id="speakoro-top-ad" style="
+  width:100%;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  margin:12px auto 18px;
+  min-height:50px;
+  overflow:hidden;
+">
+  <div style="width:320px;max-width:100%;text-align:center;">
+    <script>
+      atOptions = {
+        'key' : '7f970af1ae9650d750c4557bcc7ab300',
+        'format' : 'iframe',
+        'height' : 50,
+        'width' : 320,
+        'params' : {}
+      };
+    </script>
+    <script src="https://www.highrevenueformat.com/7f970af1ae9650d750c4557bcc7ab300/invoke.js"></script>
+  </div>
+</div>
+
 <div class="container">
 
 <header class="hero">
-  <h1>🎤 SpeakOra</h1>
+  <h1>🎤 Speakoro</h1>
   <p>Transform text into emotional speech using Voice Studio API</p>
   <div id="healthStatus" class="status">Loading...</div>
 </header>
@@ -234,17 +321,17 @@ button.refresh-voices {
 
   <div class="voice-filters">
     <select id="voiceLanguageFilter" class="voice-filter">
-      <option value="">🌐 أي لغة</option>
+      <option value="">🌐 Any Language</option>
     </select>
 
     <select id="voiceGenderSelect" class="voice-filter">
-      <option value="">⚥ أي جنس</option>
+      <option value="">⚥ Any Gender</option>
       <option value="male">♂ ذكر</option>
       <option value="female">♀ أنثى</option>
     </select>
 
     <select id="voiceCategoryFilter" class="voice-filter">
-      <option value="">🎙️ أي فئة</option>
+      <option value="">🎙️ Any Category</option>
     </select>
   </div>
 
@@ -564,9 +651,18 @@ button.refresh-voices {
     <button class="emotion" data-emotion="emphasis">✨ Emphasis</button>
   </div>
 
-  <button id="generateBtn" class="btn primary" type="button" onclick="generateSpeech()">
+  <button id="generateBtn" class="btn primary" type="button" onclick="showAdModal()">
     🎙️ Generate Speech
   </button>
+  <a
+    href="https://cowardrainbowactual.com/tht44es8sp?key=d7859f1b667778d53c4dfd041aaf0220"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="btn"
+    style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;"
+  >
+    📢 Sponsor
+  </a>
 
   <div id="progressBox" class="progress-box hidden">
     <div class="progress-title" id="progressText">Preparing...</div>
@@ -724,13 +820,44 @@ button.refresh-voices {
   <span>•</span>
   <a href="/terms">Terms of Service</a>
   <span>•</span>
-  <a href="#contact">Contact</a>
+  <a href="https://mail.google.com/mail/?view=cm&fs=1&to=fatnasaidi307@gmail.com" target="_blank" rel="noopener">Contact</a>
 </footer>
 
 
-<script id="speakora-i18n">
+<script id="speakoro-i18n">
 (() => {
   const translations = {
+    en: {
+      "Search voice by name...": "Search voice by name...",
+      "Write your text here...": "Write your text here...",
+      "Neutral": "Neutral",
+      "Excited": "Excited",
+      "Sad": "Sad",
+      "Angry": "Angry",
+      "Calm": "Calm",
+      "Whispering": "Whispering",
+      "Laughing": "Laughing",
+      "Emphasis": "Emphasis",
+      "Download MP3": "Download MP3",
+      "Copy Audio URL": "Copy Audio URL",
+      "Voice name": "Voice name",
+      "Create Clone": "Create Clone",
+      "Add audio URL": "Add audio URL",
+      "About": "About",
+      "Privacy Policy": "Privacy Policy",
+      "Terms of Service": "Terms of Service",
+      "Contact": "Contact",
+      "Any Language": "Any Language",
+      "Any Gender": "Any Gender",
+      "Any Category": "Any Category",
+      "Voices": "Voices",
+      "Text to Speech": "Text to Speech",
+      "Choose Emotion": "Choose Emotion",
+      "Generate Speech": "Generate Speech",
+      "Single request": "Single request",
+      "Voice Studio connected": "Voice Studio connected"
+    },
+
     ar: {
       "Search voice by name...": "ابحث عن صوت بالاسم...",
       "Write your text here...": "اكتب النص هنا...",
@@ -751,7 +878,15 @@ button.refresh-voices {
       "Privacy Policy": "سياسة الخصوصية",
       "Terms of Service": "شروط الاستخدام",
       "Contact": "تواصل معنا",
-      "SpeakOra": "SpeakOra"
+      "Any Language": "أي لغة",
+      "Any Gender": "أي جنس",
+      "Any Category": "أي فئة",
+      "Voices": "الأصوات",
+      "Text to Speech": "تحويل النص إلى كلام",
+      "Choose Emotion": "اختر المشاعر",
+      "Generate Speech": "توليد الصوت",
+      "Single request": "طلب واحد",
+      "Voice Studio connected": "Voice Studio متصل"
     },
 
     fr: {
@@ -774,7 +909,15 @@ button.refresh-voices {
       "Privacy Policy": "Politique de confidentialité",
       "Terms of Service": "Conditions d’utilisation",
       "Contact": "Contact",
-      "SpeakOra": "SpeakOra"
+      "Any Language": "Toutes les langues",
+      "Any Gender": "Tous les genres",
+      "Any Category": "Toutes les catégories",
+      "Voices": "Voix",
+      "Text to Speech": "Synthèse vocale",
+      "Choose Emotion": "Choisir une émotion",
+      "Generate Speech": "Générer la voix",
+      "Single request": "Requête unique",
+      "Voice Studio connected": "Voice Studio connecté"
     },
 
     es: {
@@ -797,7 +940,15 @@ button.refresh-voices {
       "Privacy Policy": "Política de privacidad",
       "Terms of Service": "Términos de servicio",
       "Contact": "Contacto",
-      "SpeakOra": "SpeakOra"
+      "Any Language": "Cualquier idioma",
+      "Any Gender": "Cualquier género",
+      "Any Category": "Cualquier categoría",
+      "Voices": "Voces",
+      "Text to Speech": "Texto a voz",
+      "Choose Emotion": "Elegir emoción",
+      "Generate Speech": "Generar voz",
+      "Single request": "Solicitud única",
+      "Voice Studio connected": "Voice Studio conectado"
     },
 
     de: {
@@ -820,13 +971,26 @@ button.refresh-voices {
       "Privacy Policy": "Datenschutzerklärung",
       "Terms of Service": "Nutzungsbedingungen",
       "Contact": "Kontakt",
-      "SpeakOra": "SpeakOra"
+      "Any Language": "Jede Sprache",
+      "Any Gender": "Jedes Geschlecht",
+      "Any Category": "Jede Kategorie",
+      "Voices": "Stimmen",
+      "Text to Speech": "Text zu Sprache",
+      "Choose Emotion": "Emotion auswählen",
+      "Generate Speech": "Sprache generieren",
+      "Single request": "Einzelanfrage",
+      "Voice Studio connected": "Voice Studio verbunden"
     }
   };
 
   const deviceLang = (navigator.language || "en").toLowerCase();
-  const lang = Object.keys(translations).find(x => deviceLang === x || deviceLang.startsWith(x + "-")) || "en";
-  const dict = translations[lang] || {};
+
+  const lang =
+    Object.keys(translations).find(
+      x => deviceLang === x || deviceLang.startsWith(x + "-")
+    ) || "en";
+
+  const dict = translations[lang];
 
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
@@ -837,41 +1001,51 @@ button.refresh-voices {
     const walker = document.createTreeWalker(
       root,
       NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node) {
-          const parent = node.parentElement;
-          if (!parent) return NodeFilter.FILTER_REJECT;
-          if (["SCRIPT", "STYLE", "NOSCRIPT"].includes(parent.tagName)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
+      null
     );
 
     const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
 
-    for (const node of nodes) {
-      const original = node.nodeValue.trim();
-      if (!original || !dict[original]) continue;
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const parent = node.parentElement;
 
-      const start = node.nodeValue.indexOf(original);
-      node.nodeValue =
-        node.nodeValue.slice(0, start) +
-        dict[original] +
-        node.nodeValue.slice(start + original.length);
+      if (!parent) continue;
+
+      if (
+        ["SCRIPT", "STYLE", "NOSCRIPT"].includes(parent.tagName)
+      ) {
+        continue;
+      }
+
+      nodes.push(node);
     }
 
-    root.querySelectorAll?.("input[placeholder], textarea[placeholder]").forEach(el => {
+    for (const node of nodes) {
+      const text = node.nodeValue;
+
+      for (const [source, target] of Object.entries(dict)) {
+        if (text.includes(source)) {
+          node.nodeValue = node.nodeValue.split(source).join(target);
+        }
+      }
+    }
+
+    root.querySelectorAll?.(
+      "input[placeholder], textarea[placeholder]"
+    ).forEach(el => {
       const value = el.getAttribute("placeholder");
+
       if (value && dict[value]) {
         el.setAttribute("placeholder", dict[value]);
       }
     });
 
-    root.querySelectorAll?.("input[aria-label], button[aria-label]").forEach(el => {
+    root.querySelectorAll?.(
+      "input[aria-label], button[aria-label]"
+    ).forEach(el => {
       const value = el.getAttribute("aria-label");
+
       if (value && dict[value]) {
         el.setAttribute("aria-label", dict[value]);
       }
@@ -896,7 +1070,7 @@ button.refresh-voices {
       subtree: true
     });
 
-    console.log("SpeakOra language:", lang);
+    console.log("Speakoro language:", lang);
   }
 
   if (document.readyState === "loading") {
@@ -906,6 +1080,108 @@ button.refresh-voices {
   }
 })();
 </script>
+
+<!-- ADSTERRA-ADS -->
+
+<!-- ADSTERRA 300x250 -->
+<div style="display:flex;justify-content:center;margin:24px auto;">
+<script>
+  atOptions = {
+    'key' : '508e5f01e39a99b2539ec5e370ab4e28',
+    'format' : 'iframe',
+    'height' : 250,
+    'width' : 300,
+    'params' : {}
+  };
+</script>
+<!-- SPEAKORO BOTTOM AD -->
+<div id="speakoro-bottom-ad" style="
+  width:100%;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  margin:28px auto 20px;
+  min-height:250px;
+  overflow:hidden;
+">
+  <div style="width:300px;max-width:100%;text-align:center;">
+    <script>
+      atOptions = {
+        'key' : '508e5f01e39a99b2539ec5e370ab4e28',
+        'format' : 'iframe',
+        'height' : 250,
+        'width' : 300,
+        'params' : {}
+      };
+    </script>
+    <script src="https://www.highrevenueformat.com/508e5f01e39a99b2539ec5e370ab4e28/invoke.js"></script>
+  </div>
+</div>
+
+
+
+
+<div id="adModal" style="display:none;" class="modal" dir="rtl">
+  <div class="modal-content">
+    <p id="modalMessage"></p>
+
+    <div class="modal-buttons">
+      <button id="supportBtn" class="btn-primary" type="button"></button>
+      <button id="skipBtn" class="btn-secondary" type="button"></button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Speakoro Premium Voice Modal -->
+<div id="premiumVoiceModal" style="display:none;" class="modal" dir="rtl">
+  <div class="modal-content" style="position:relative;max-width:430px;">
+    <button
+      id="premiumVoiceClose"
+      type="button"
+      aria-label="Close"
+      style="
+        position:absolute;
+        top:10px;
+        right:10px;
+        width:32px;
+        height:32px;
+        border:0;
+        border-radius:50%;
+        cursor:pointer;
+        font-size:20px;
+      "
+    >×</button>
+
+    <div style="font-size:30px;margin-bottom:10px;">⭐</div>
+
+    <h3 id="premiumVoiceTitle" style="margin:0 0 10px;">
+      Premium Voice
+    </h3>
+
+    <p id="premiumVoiceMessage" style="line-height:1.6;margin:0 0 18px;">
+      هذه الشخصية Premium. يمكنك دعم الموقع بمشاهدة إعلان قصير ثم الحصول على الصوت.
+    </p>
+
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button
+        id="premiumVoiceAdBtn"
+        type="button"
+        class="btn-primary"
+      >
+        ⭐ مشاهدة الإعلان والمتابعة
+      </button>
+
+      <button
+        id="premiumVoiceContinueBtn"
+        type="button"
+        class="btn-secondary"
+      >
+        المتابعة بدون إعلان
+      </button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
