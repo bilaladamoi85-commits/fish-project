@@ -1,10 +1,17 @@
 import {
   auth,
+  db,
   getUserProfile,
   loginWithGoogle,
   saveDisplayName,
   onAuthStateChanged
 } from "./auth.js";
+
+import {
+  doc,
+  runTransaction,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 let authReady = false;
 let currentUser = null;
@@ -530,6 +537,32 @@ function showDisplayNameView(user) {
   });
 }
 
+
+async function recordSponsorClick() {
+  if (!currentUser) {
+    throw new Error("يجب تسجيل الدخول أولاً.");
+  }
+
+  const user = currentUser;
+  const sponsorRef = doc(db, "sponsors", user.uid);
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(sponsorRef);
+    const currentCount = snapshot.exists()
+      ? Number(snapshot.data().count || 0)
+      : 0;
+
+    transaction.set(sponsorRef, {
+      uid: user.uid,
+      displayName: String(user.displayName || "").trim(),
+      email: user.email || "",
+      photoURL: user.photoURL || "",
+      count: currentCount + 1,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  });
+}
+
 function closeModal(success = false) {
   if (modal) {
     modal.remove();
@@ -611,5 +644,30 @@ onAuthStateChanged(auth, (user) => {
   const btn = document.getElementById("speakoraLogoutBtn");
   if (btn) {
     btn.style.display = user ? "inline-flex" : "none";
+  }
+});
+
+document.addEventListener("click", async (event) => {
+  const sponsorButton = event.target.closest("#sponsorBtn");
+
+  if (!sponsorButton) return;
+
+  event.preventDefault();
+
+  try {
+    const authenticated = await requireSpeakOraAuth();
+
+    if (!authenticated) return;
+
+    await recordSponsorClick();
+
+    window.open(
+      sponsorButton.href,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  } catch (error) {
+    console.error("SpeakOra sponsor click failed:", error);
+    alert("تعذر تسجيل Sponsor. حاول مرة أخرى.");
   }
 });
