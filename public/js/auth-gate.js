@@ -666,6 +666,7 @@ function startSponsorCounter() {
     counter.textContent = total.toLocaleString("en-US");
   }, (error) => {
     console.error("Sponsor counter error:", error);
+    counter.textContent = "—";
   });
 }
 
@@ -695,8 +696,6 @@ document.addEventListener("click", async (event) => {
 });
 
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", startSponsorCounter);
-} else {
+waitForAuth().then(() => {
   startSponsorCounter();
-}
+});
