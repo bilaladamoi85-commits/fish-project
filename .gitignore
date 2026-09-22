@@ -2,3 +2,5 @@ runtime/audio/
 *.backup
 *.bak*
 server.js.backup*
+
+.env
