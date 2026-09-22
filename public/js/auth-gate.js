@@ -1,11 +1,12 @@
 import {
   auth,
-  db,
   getUserProfile,
   loginWithGoogle,
   saveDisplayName,
   onAuthStateChanged
 } from "./auth.js";
+
+import { db } from "./firebase-config.js";
 
 import {
   collection,
@@ -546,6 +547,15 @@ async function recordSponsorClick() {
   }
 
   const user = currentUser;
+  const profile = await getUserProfile(user);
+  const displayName = String(
+    profile?.displayName || user.displayName || ""
+  ).trim();
+
+  if (!displayName) {
+    throw new Error("يجب حفظ اسم العرض أولاً.");
+  }
+
   const sponsorRef = doc(db, "sponsors", user.uid);
 
   await runTransaction(db, async (transaction) => {
@@ -556,7 +566,7 @@ async function recordSponsorClick() {
 
     transaction.set(sponsorRef, {
       uid: user.uid,
-      displayName: String(user.displayName || "").trim(),
+      displayName,
       email: user.email || "",
       photoURL: user.photoURL || "",
       count: currentCount + 1,
@@ -652,22 +662,78 @@ onAuthStateChanged(auth, (user) => {
 
 function startSponsorCounter() {
   const counter = document.getElementById("sponsorTotalCount");
-  if (!counter) return;
+  const leaderboard = document.getElementById("sponsorLeaderboard");
 
   const sponsorsRef = collection(db, "sponsors");
 
   onSnapshot(sponsorsRef, (snapshot) => {
     let total = 0;
 
-    snapshot.forEach((docSnapshot) => {
-      total += Number(docSnapshot.data().count || 0);
-    });
+    const rows = snapshot.docs
+      .map((docSnapshot) => {
+        const data = docSnapshot.data();
+        const count = Number(data.count || 0);
 
-    counter.textContent = total.toLocaleString("en-US");
+        total += count;
+
+        return {
+          uid: docSnapshot.id,
+          displayName: String(data.displayName || "User").trim() || "User",
+          count
+        };
+      })
+      .filter(item => item.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    if (counter) {
+      counter.textContent = total.toLocaleString("en-US");
+    }
+
+    if (leaderboard) {
+      const top10 = rows.slice(0, 10);
+
+      if (!top10.length) {
+        leaderboard.innerHTML =
+          '<div style="padding:12px;text-align:center;color:#9ca3af;">لا توجد Sponsors بعد</div>';
+        return;
+      }
+
+      leaderboard.innerHTML = top10.map((item, index) => `
+        <div style="
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:12px;
+          padding:9px 12px;
+          border-bottom:1px solid rgba(0,0,0,.06);
+        ">
+          <span style="font-weight:800;min-width:34px;">#${index + 1}</span>
+          <span style="flex:1;text-align:start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${escapeHtmlSponsor(item.displayName)}
+          </span>
+          <strong>${item.count.toLocaleString("en-US")}</strong>
+        </div>
+      `).join("");
+    }
   }, (error) => {
     console.error("Sponsor counter error:", error);
-    counter.textContent = "—";
+
+    if (counter) counter.textContent = "—";
+
+    if (leaderboard) {
+      leaderboard.innerHTML =
+        '<div style="padding:12px;text-align:center;color:#b91c1c;">تعذر تحميل بيانات Sponsors</div>';
+    }
   });
+}
+
+function escapeHtmlSponsor(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 document.addEventListener("click", async (event) => {
