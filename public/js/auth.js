@@ -60,3 +60,13 @@ export async function saveDisplayName(user, displayName) {
 }
 
 export { auth, onAuthStateChanged, signOut };
+
+window.speakOraLogout = async function () {
+  try {
+    await signOut(auth);
+    window.location.reload();
+  } catch (error) {
+    console.error("Logout failed:", error);
+    alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
+  }
+};

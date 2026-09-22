@@ -606,3 +606,10 @@ onAuthStateChanged(auth, (user) => {
 });
 
 window.requireSpeakOraAuth = requireSpeakOraAuth;
+
+onAuthStateChanged(auth, (user) => {
+  const btn = document.getElementById("speakoraLogoutBtn");
+  if (btn) {
+    btn.style.display = user ? "inline-flex" : "none";
+  }
+});
