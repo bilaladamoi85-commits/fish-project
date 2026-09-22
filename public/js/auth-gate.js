@@ -8,7 +8,9 @@ import {
 } from "./auth.js";
 
 import {
+  collection,
   doc,
+  onSnapshot,
   runTransaction,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
@@ -647,6 +649,26 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
+
+function startSponsorCounter() {
+  const counter = document.getElementById("sponsorTotalCount");
+  if (!counter) return;
+
+  const sponsorsRef = collection(db, "sponsors");
+
+  onSnapshot(sponsorsRef, (snapshot) => {
+    let total = 0;
+
+    snapshot.forEach((docSnapshot) => {
+      total += Number(docSnapshot.data().count || 0);
+    });
+
+    counter.textContent = total.toLocaleString("en-US");
+  }, (error) => {
+    console.error("Sponsor counter error:", error);
+  });
+}
+
 document.addEventListener("click", async (event) => {
   const sponsorButton = event.target.closest("#sponsorBtn");
 
@@ -671,3 +693,10 @@ document.addEventListener("click", async (event) => {
     alert("تعذر تسجيل Sponsor. حاول مرة أخرى.");
   }
 });
+
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startSponsorCounter);
+} else {
+  startSponsorCounter();
+}
