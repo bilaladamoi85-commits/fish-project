@@ -293,7 +293,7 @@ function createModal() {
     <div class="speakora-auth-card" role="dialog" aria-modal="true">
       <div class="speakora-auth-logo">S</div>
 
-      <h2 class="speakora-auth-title">سجّل دخولك إلى SpeakOra</h2>
+      <h2 class="speakora-auth-title">سجّل دخولك إلى Shynsu AI</h2>
 
       <div class="speakora-auth-subtitle">
         سجّل دخولك بحساب Google للمتابعة وإنشاء الأصوات.
@@ -329,7 +329,7 @@ function clearError() {
 function friendlyFirebaseError(error) {
   const code = error?.code || "";
 
-  console.error("Speakora Firebase error:", error);
+  console.error("Shynsu AI Firebase error:", error);
 
   if (code === "permission-denied" || code === "firestore/permission-denied") {
     return "ليس لديك صلاحية لحفظ اسم العرض. تحقق من إعدادات Firestore.";
@@ -470,7 +470,7 @@ function showDisplayNameView(user) {
       <div class="speakora-auth-error" id="speakoraAuthError"></div>
 
       <div class="speakora-auth-note">
-        اسم العرض مطلوب لإكمال استخدام SpeakOra.
+        اسم العرض مطلوب لإكمال استخدام Shynsu AI.
       </div>
     </div>
   `;
@@ -521,7 +521,7 @@ function showDisplayNameView(user) {
 
       closeModal(true);
     } catch (error) {
-      console.error("Speakora display name save error:", error);
+      console.error("Shynsu AI display name save error:", error);
 
       showError(friendlyFirebaseError(error));
 
@@ -608,7 +608,7 @@ async function openModal(user = null) {
   }
 }
 
-export async function requireSpeakOraAuth() {
+export async function requireShynsu AIAuth() {
   await waitForAuth();
 
   if (currentUser) {
@@ -626,7 +626,7 @@ export async function requireSpeakOraAuth() {
         await openModal(currentUser);
       });
     } catch (error) {
-      console.error("Speakora profile check error:", error);
+      console.error("Shynsu AI profile check error:", error);
 
       return new Promise(async (resolve, reject) => {
         authPromiseResolve = resolve;
@@ -650,7 +650,7 @@ onAuthStateChanged(auth, (user) => {
   authReady = true;
 });
 
-window.requireSpeakOraAuth = requireSpeakOraAuth;
+window.requireShynsu AIAuth = requireShynsu AIAuth;
 
 onAuthStateChanged(auth, (user) => {
   const btn = document.getElementById("speakoraLogoutBtn");
@@ -744,7 +744,7 @@ document.addEventListener("click", async (event) => {
   event.preventDefault();
 
   try {
-    const authenticated = await requireSpeakOraAuth();
+    const authenticated = await requireShynsu AIAuth();
 
     if (!authenticated) return;
 
@@ -756,7 +756,7 @@ document.addEventListener("click", async (event) => {
       "noopener,noreferrer"
     );
   } catch (error) {
-    console.error("SpeakOra sponsor click failed:", error);
+    console.error("Shynsu AI sponsor click failed:", error);
     alert("تعذر تسجيل Sponsor. حاول مرة أخرى.");
   }
 });

@@ -1423,7 +1423,7 @@ let pendingPremiumVoiceId = "";
 
     if (messageEl) {
       messageEl.textContent =
-        "هذه الشخصية Premium. يمكنك مشاهدة إعلان قصير لدعم بقاء SpeakOra مجانيًا، ثم المتابعة لاستخدام الصوت.";
+        "هذه الشخصية Premium. يمكنك مشاهدة إعلان قصير لدعم بقاء Shynsu AI مجانيًا، ثم المتابعة لاستخدام الصوت.";
     }
 
     modal.style.display = "flex";
@@ -1554,7 +1554,7 @@ let pendingPremiumVoiceId = "";
       );
 
       setTimeout(() => {
-        showSpeakOraThankYou(() => {
+        showShynsu AIThankYou(() => {
 
           if (
             savedPremiumId &&
@@ -1576,10 +1576,10 @@ let pendingPremiumVoiceId = "";
 
 
 /* ================================
-   SpeakOra Thank You After Ad
+   Shynsu AI Thank You After Ad
    ================================ */
 
-function showSpeakOraThankYou(onClose) {
+function showShynsu AIThankYou(onClose) {
   let modal = document.getElementById("speakoraThankYouModal");
 
   if (!modal) {
@@ -1590,7 +1590,7 @@ function showSpeakOraThankYou(onClose) {
       <div class="speakora-thankyou-card" dir="rtl">
         <div class="speakora-thankyou-icon">❤️</div>
         <h2>شكرًا لك!</h2>
-        <p>شكرًا لمشاهدتك الإعلان ودعمك لـ SpeakOra.</p>
+        <p>شكرًا لمشاهدتك الإعلان ودعمك لـ Shynsu AI.</p>
         <button type="button" id="speakoraThankYouClose">
           إغلاق
         </button>
@@ -1691,7 +1691,7 @@ function showSpeakOraThankYou(onClose) {
 }
 
 /* ================================
-   End SpeakOra Thank You After Ad
+   End Shynsu AI Thank You After Ad
    ================================ */
 
 /* ===== Recent Voices ===== */
@@ -2451,7 +2451,7 @@ window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
 };
 
 /* ================================
-   SpeakOra Support Modal
+   Shynsu AI Support Modal
    ================================ */
 
 const SPEAKORA_SMARTLINK =
@@ -2472,12 +2472,12 @@ const speakoraTranslations = {
   }
 };
 
-function getSpeakOraLanguage() {
+function getShynsu AILanguage() {
   const lang = (navigator.language || navigator.userLanguage || "ar").toLowerCase();
   return lang.startsWith("ar") ? "ar" : "en";
 }
 
-function updateSpeakOraModal() {
+function updateShynsu AIModal() {
   const modal = document.getElementById("adModal");
   const message = document.getElementById("modalMessage");
   const support = document.getElementById("supportBtn");
@@ -2485,7 +2485,7 @@ function updateSpeakOraModal() {
 
   if (!modal || !message || !support || !skip) return;
 
-  const lang = getSpeakOraLanguage();
+  const lang = getShynsu AILanguage();
   const t = speakoraTranslations[lang];
 
   modal.dir = lang === "ar" ? "rtl" : "ltr";
@@ -2502,11 +2502,11 @@ function showAdModal() {
     return;
   }
 
-  updateSpeakOraModal();
+  updateShynsu AIModal();
   modal.style.display = "flex";
 }
 
-function closeSpeakOraModal() {
+function closeShynsu AIModal() {
   const modal = document.getElementById("adModal");
   if (modal) modal.style.display = "none";
 }
@@ -2530,10 +2530,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (pending === "1") {
       sessionStorage.removeItem("speakora_pending_generation");
 
-      closeSpeakOraModal();
+      closeShynsu AIModal();
 
       setTimeout(() => {
-        showSpeakOraThankYou(() => {
+        showShynsu AIThankYou(() => {
           generateSpeech();
         });
       }, 250);
@@ -2542,7 +2542,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (skipBtn) {
     skipBtn.addEventListener("click", () => {
-      closeSpeakOraModal();
+      closeShynsu AIModal();
       generateSpeech();
     });
   }
@@ -2550,7 +2550,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (modal) {
     modal.addEventListener("click", (e) => {
       if (e.target === modal) {
-        closeSpeakOraModal();
+        closeShynsu AIModal();
       }
     });
   }
