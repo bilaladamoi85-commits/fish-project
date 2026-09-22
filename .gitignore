@@ -4,3 +4,9 @@ runtime/audio/
 server.js.backup*
 
 .env
+
+node_modules/
+
+.env
+
+.env

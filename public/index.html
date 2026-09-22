@@ -750,7 +750,7 @@ button.refresh-voices {
     <button class="emotion" data-emotion="emphasis">✨ Emphasis</button>
   </div>
 
-  <button id="generateBtn" class="btn primary" type="button" onclick="showAdModal()">
+  <button id="generateBtn" class="btn primary" type="button" onclick="requireSpeakOraAuth().then(ok => { if (ok) showAdModal(); })">
     🎙️ Generate Speech
   </button>
   <a
@@ -817,6 +817,11 @@ button.refresh-voices {
 
 </div>
 <script src="app.js"></script>
+<script type="module">
+  import { requireSpeakOraAuth } from "./js/auth-gate.js";
+
+  window.requireSpeakOraAuth = requireSpeakOraAuth;
+</script>
 
 
 
@@ -2918,3 +2923,28 @@ button:active,
   }
 }
 </style>
+
+<script type="module">
+  import { auth, getUserProfile, onAuthStateChanged } from "./js/auth.js";
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return;
+
+    try {
+      const profile = await getUserProfile(user);
+
+      if (!profile || !profile.displayName) {
+        const currentPath =
+          window.location.pathname + window.location.search;
+
+        if (!window.location.pathname.includes("display-name.html")) {
+          window.location.href =
+            "/display-name.html?return=" +
+            encodeURIComponent(currentPath);
+        }
+      }
+    } catch (error) {
+      console.error("Profile check failed:", error);
+    }
+  });
+</script>
