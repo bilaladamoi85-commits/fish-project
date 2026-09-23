@@ -1554,7 +1554,7 @@ let pendingPremiumVoiceId = "";
       );
 
       setTimeout(() => {
-        showShynsu AIThankYou(() => {
+        showSpeakOraThankYou(() => {
 
           if (
             savedPremiumId &&
@@ -1579,7 +1579,7 @@ let pendingPremiumVoiceId = "";
    Shynsu AI Thank You After Ad
    ================================ */
 
-function showShynsu AIThankYou(onClose) {
+function showSpeakOraThankYou(onClose) {
   let modal = document.getElementById("speakoraThankYouModal");
 
   if (!modal) {
@@ -2472,12 +2472,12 @@ const speakoraTranslations = {
   }
 };
 
-function getShynsu AILanguage() {
+function getSpeakOraLanguage() {
   const lang = (navigator.language || navigator.userLanguage || "ar").toLowerCase();
   return lang.startsWith("ar") ? "ar" : "en";
 }
 
-function updateShynsu AIModal() {
+function updateSpeakOraModal() {
   const modal = document.getElementById("adModal");
   const message = document.getElementById("modalMessage");
   const support = document.getElementById("supportBtn");
@@ -2485,7 +2485,7 @@ function updateShynsu AIModal() {
 
   if (!modal || !message || !support || !skip) return;
 
-  const lang = getShynsu AILanguage();
+  const lang = getSpeakOraLanguage();
   const t = speakoraTranslations[lang];
 
   modal.dir = lang === "ar" ? "rtl" : "ltr";
@@ -2502,11 +2502,11 @@ function showAdModal() {
     return;
   }
 
-  updateShynsu AIModal();
+  updateSpeakOraModal();
   modal.style.display = "flex";
 }
 
-function closeShynsu AIModal() {
+function closeSpeakOraModal() {
   const modal = document.getElementById("adModal");
   if (modal) modal.style.display = "none";
 }
@@ -2530,10 +2530,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (pending === "1") {
       sessionStorage.removeItem("speakora_pending_generation");
 
-      closeShynsu AIModal();
+      closeSpeakOraModal();
 
       setTimeout(() => {
-        showShynsu AIThankYou(() => {
+        showSpeakOraThankYou(() => {
           generateSpeech();
         });
       }, 250);
@@ -2542,7 +2542,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (skipBtn) {
     skipBtn.addEventListener("click", () => {
-      closeShynsu AIModal();
+      closeSpeakOraModal();
       generateSpeech();
     });
   }
@@ -2550,7 +2550,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (modal) {
     modal.addEventListener("click", (e) => {
       if (e.target === modal) {
-        closeShynsu AIModal();
+        closeSpeakOraModal();
       }
     });
   }
