@@ -31,7 +31,7 @@ const PARALLEL = 1;
 app.disable('x-powered-by');
 
 const SPEAKORA_ALLOWED_ORIGINS = new Set([
-  'https://shynsuai.vercel.app',
+  'https://speakoraa.vercel.app',
   'http://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3000',

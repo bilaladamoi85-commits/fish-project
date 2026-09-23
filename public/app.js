@@ -1423,7 +1423,7 @@ let pendingPremiumVoiceId = "";
 
     if (messageEl) {
       messageEl.textContent =
-        "هذه الشخصية Premium. يمكنك مشاهدة إعلان قصير لدعم بقاء Shynsu AI مجانيًا، ثم المتابعة لاستخدام الصوت.";
+        "هذه الشخصية Premium. يمكنك مشاهدة إعلان قصير لدعم بقاء SpeakOra مجانيًا، ثم المتابعة لاستخدام الصوت.";
     }
 
     modal.style.display = "flex";
@@ -1576,7 +1576,7 @@ let pendingPremiumVoiceId = "";
 
 
 /* ================================
-   Shynsu AI Thank You After Ad
+   SpeakOra Thank You After Ad
    ================================ */
 
 function showSpeakOraThankYou(onClose) {
@@ -1590,7 +1590,7 @@ function showSpeakOraThankYou(onClose) {
       <div class="speakora-thankyou-card" dir="rtl">
         <div class="speakora-thankyou-icon">❤️</div>
         <h2>شكرًا لك!</h2>
-        <p>شكرًا لمشاهدتك الإعلان ودعمك لـ Shynsu AI.</p>
+        <p>شكرًا لمشاهدتك الإعلان ودعمك لـ SpeakOra.</p>
         <button type="button" id="speakoraThankYouClose">
           إغلاق
         </button>
@@ -1691,7 +1691,7 @@ function showSpeakOraThankYou(onClose) {
 }
 
 /* ================================
-   End Shynsu AI Thank You After Ad
+   End SpeakOra Thank You After Ad
    ================================ */
 
 /* ===== Recent Voices ===== */
@@ -2451,7 +2451,7 @@ window.saveVoiceManualOnly = function(event, voiceId, voiceName, lang, audio) {
 };
 
 /* ================================
-   Shynsu AI Support Modal
+   SpeakOra Support Modal
    ================================ */
 
 const SPEAKORA_SMARTLINK =
