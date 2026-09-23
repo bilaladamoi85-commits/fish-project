@@ -679,7 +679,7 @@ async function previewVoice(id, button) {
         try {
           window.__fishPreviewAudio.pause();
           window.__fishPreviewAudio.removeAttribute("src");
-        } catch (_) {}
+        } catch (error) { console.error("TTS WATCHER ERROR:", error); }
       }
 
       window.__fishPreviewAudio = audio;
