@@ -22,7 +22,7 @@ const FISH_BASE = 'https://api.fish.audio';
 const FISH_MODEL = 's2.1-pro-free';
 
 const CHUNK_SIZE = 900;
-const PARALLEL = 4;
+const PARALLEL = 30;
 
 // ============================================================
 // SpeakOra Security Layer - internal protection, no external service
