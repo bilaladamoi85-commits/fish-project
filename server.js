@@ -5,6 +5,8 @@ const axios = require('axios');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFile } = require('child_process');
+const ffmpegPath = require('ffmpeg-static');
 const app = express();
 
 const ttsJobs = new Map();
@@ -235,6 +237,40 @@ app.use(express.static(path.join(__dirname, 'public'), {
   index: 'index.html'
 }));
 
+function normalizeArabicTTS(text) {
+  let s = String(text || "");
+
+  // Normalize Unicode Arabic forms.
+  s = s.normalize("NFC");
+
+  // Remove tatweel and invisible formatting characters.
+  s = s
+    .replace(/ـ+/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "");
+
+  // Collapse whitespace so accidental spaces don't become pauses.
+  s = s.replace(/\s+/g, " ").trim();
+
+  // Reduce repeated punctuation that can create unnatural pauses.
+  s = s
+    .replace(/([،,:;.!؟?]){2,}/g, "$1")
+    .replace(/\.{2,}/g, "،")
+    .replace(/،{2,}/g, "،")
+    .replace(/!{2,}/g, "!")
+    .replace(/؟{2,}/g, "؟");
+
+  // Remove spaces before punctuation and keep a single space after it.
+  s = s
+    .replace(/\s+([،,:;.!؟?])/g, "$1")
+    .replace(/([،؛:])\s*/g, "$1 ")
+    .replace(/([.!؟])\s*/g, "$1 ");
+
+  // Keep sentence punctuation readable without creating huge gaps.
+  s = s.replace(/\s{2,}/g, " ").trim();
+
+  return s;
+}
+
 function splitText(text, maxChars = CHUNK_SIZE) {
   const clean = String(text || '')
     .replace(/\r\n/g, '\n')
@@ -264,9 +300,9 @@ function splitText(text, maxChars = CHUNK_SIZE) {
     '.',
     '؛',
     ';',
+    ':',
     '،',
-    ',',
-    ':'
+    ','
   ];
 
   while (remaining.length > maxChars) {
@@ -546,7 +582,6 @@ async function mergeMp3(buffers) {
   const files = [];
 
   try {
-    // Write every MP3 part separately.
     for (let i = 0; i < buffers.length; i++) {
       const file = path.join(
         tempDir,
@@ -557,29 +592,54 @@ async function mergeMp3(buffers) {
       files.push(file);
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * Do NOT use MP3 "concat copy" here.
-     *
-     * Independently generated MP3 files can contain different
-     * encoder delay/padding/frame boundaries. Joining those raw
-     * MP3 streams can cause short distortions/glitches at the
-     * transition between chunks.
-     *
-     * Instead:
-     *   MP3 -> decoded audio -> normalized -> concatenated
-     *   -> ONE final MP3 encode
-     *
-     * This makes the transitions much cleaner.
-     */
+    const listFile = path.join(tempDir, 'inputs.txt');
+    const outputFile = path.join(tempDir, 'merged.mp3');
 
-    const finalBuffer = Buffer.concat(buffers.map(buffer => Buffer.from(buffer)));
+    const list = files
+      .map(file => `file '${file.replace(/'/g, "'\\''")}'`)
+      .join('\n');
 
+    fs.writeFileSync(listFile, list + '\n', 'utf8');
 
+    await new Promise((resolve, reject) => {
+      execFile(
+        ffmpegPath,
+        [
+          '-hide_banner',
+          '-loglevel', 'error',
+          '-f', 'concat',
+          '-safe', '0',
+          '-i', listFile,
+          '-vn',
+          '-c:a', 'libmp3lame',
+          '-b:a', '192k',
+          '-ar', '44100',
+          '-ac', '2',
+          '-y',
+          outputFile
+        ],
+        {
+          maxBuffer: 2 * 1024 * 1024
+        },
+        (error, stdout, stderr) => {
+          if (error) {
+            reject(
+              new Error(
+                `FFmpeg merge failed: ${stderr || error.message}`
+              )
+            );
+            return;
+          }
+
+          resolve();
+        }
+      );
+    });
+
+    const finalBuffer = fs.readFileSync(outputFile);
 
     console.log(
-      `🔗 MP3 merge complete: ${files.length} parts -> ${(
+      `🔗 FFmpeg merge complete: ${files.length} parts -> ${(
         finalBuffer.length / 1024 / 1024
       ).toFixed(2)} MB`
     );
@@ -588,511 +648,13 @@ async function mergeMp3(buffers) {
 
   } finally {
     try {
-      fs.rmSync(
-        tempDir,
-        {
-          recursive: true,
-          force: true
-        }
-      );
+      fs.rmSync(tempDir, {
+        recursive: true,
+        force: true
+      });
     } catch (_) {}
   }
 }
-
-
-function similarityScore(query, voice) {
-  const q = String(query || '')
-    .toLowerCase()
-    .trim();
-
-  if (!q) return 0;
-
-  const name = String(
-    voice.title ||
-    voice.name ||
-    voice.display_name ||
-    ''
-  ).toLowerCase();
-
-  if (name === q) return 10000;
-  if (name.startsWith(q)) return 8000;
-  if (name.includes(q)) return 6000;
-
-  const words = q
-    .split(/\s+/)
-    .filter(Boolean);
-
-  let score = 0;
-
-  for (const word of words) {
-    if (name.includes(word)) {
-      score += 100;
-    }
-  }
-
-  return score;
-}
-
-app.get('/api/health', (req, res) => {
-  res.json({
-    ok: true,
-    service: 'Fish Audio Voice App',
-    fishConfigured: Boolean(FISH_API_KEY),
-    chunkSize: CHUNK_SIZE,
-    parallel: PARALLEL
-  });
-});
-
-app.get('/api/voices', async (req, res) => {
-  try {
-    const page = Math.max(
-      1,
-      Number(req.query.page) || 1
-    );
-
-    const pageSize = Math.min(
-      100,
-      Math.max(
-        1,
-        Number(req.query.pageSize) || 100
-      )
-    );
-
-    const search =
-      String(req.query.search || '').trim();
-
-    const language =
-      String(req.query.language || '').trim();
-
-    const params = {
-      page_number: page,
-      page_size: pageSize
-    };
-
-    if (search) {
-      params.title = search;
-    }
-
-    if (language) {
-      params.language = language;
-    }
-
-    const response = await axios.get(
-      `${FISH_BASE}/model`,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${FISH_API_KEY}`
-        },
-        params,
-        timeout: 30000
-      }
-    );
-
-    const raw =
-      Array.isArray(response.data)
-        ? response.data
-        : (
-          response.data.items ||
-          response.data.data ||
-          response.data.models ||
-          []
-        );
-
-    const voices = raw.map(v => ({
-      id:
-        v.id ||
-        v._id ||
-        v.reference_id,
-
-      name:
-        v.title ||
-        v.name ||
-        v.display_name ||
-        'Unnamed Voice',
-
-      title:
-        v.title ||
-        v.name ||
-        v.display_name ||
-        'Unnamed Voice',
-
-      description:
-        v.description || '',
-
-      language:
-        v.language ||
-        (Array.isArray(v.languages) && v.languages.length
-          ? v.languages[0]
-          : ''),
-      languages:
-        Array.isArray(v.languages) ? v.languages : [],
-      default_text:
-        v.default_text || '',
-      samples:
-        Array.isArray(v.samples) ? v.samples : [],
-      country:
-        v.country ||
-        v.country_name ||
-        v.countryName ||
-        v.country_code ||
-        v.countryCode ||
-        '',
-      countryCode:
-        v.countryCode ||
-        v.country_code ||
-        '',
-      tags:
-        Array.isArray(v.tags)
-          ? v.tags
-          : [],
-
-      labels:
-        Array.isArray(v.labels)
-          ? v.labels
-          : [],
-
-      category:
-        v.category ||
-        v.category_name ||
-        v.categoryName ||
-        v.type ||
-        v.style ||
-        '',
-
-      categories: [
-        v.category,
-        v.category_name,
-        v.categoryName,
-        v.type,
-        v.style,
-        v.voice_style,
-        v.voiceStyle,
-        ...(Array.isArray(v.categories) ? v.categories : []),
-        ...(Array.isArray(v.tags) ? v.tags : []),
-        ...(Array.isArray(v.labels) ? v.labels : [])
-      ]
-        .flat()
-        .filter(Boolean)
-        .map(x => String(x).trim()),
-
-      gender:
-        v.gender ||
-        v.sex ||
-        '',
-
-      author:
-        v.author || null,
-
-      cover_image:
-        v.cover_image ||
-        v.coverImage ||
-        null,
-
-      avatar:
-        v.avatar ||
-        v.author?.avatar ||
-        null
-    }));
-
-    if (search) {
-      voices.sort(
-        (a, b) =>
-          similarityScore(search, b) -
-          similarityScore(search, a)
-      );
-    }
-
-    const total =
-      Number(
-        response.data.total ||
-        response.data.count ||
-        0
-      );
-
-    res.json({
-      voices,
-      page,
-      pageSize,
-      total,
-      hasMore:
-        Boolean(
-          response.data.has_more ??
-          response.data.hasMore ??
-          voices.length >= pageSize
-        )
-    });
-
-  } catch (error) {
-    console.error(
-      'Voice search error:',
-      error.response?.data ||
-      error.message
-    );
-
-    res.status(
-      error.response?.status || 500
-    ).json({
-      error:
-        'فشل تحميل الأصوات',
-      details:
-        error.response?.data ||
-        error.message
-    });
-  }
-});
-
-app.get('/api/my-voices', async (req, res) => {
-  try {
-    const response = await axios.get(
-      `${FISH_BASE}/model`,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${FISH_API_KEY}`
-        },
-        params: {
-          self: true,
-          page_number: 1,
-          page_size: 100
-        },
-        timeout: 30000
-      }
-    );
-
-    const raw =
-      Array.isArray(response.data)
-        ? response.data
-        : (
-          response.data.items ||
-          response.data.data ||
-          []
-        );
-
-    const voices = raw.map(v => ({
-      id:
-        v.id ||
-        v._id ||
-        v.reference_id,
-
-      name:
-        v.title ||
-        v.name ||
-        v.display_name ||
-        'Unnamed Voice',
-
-      title:
-        v.title ||
-        v.name ||
-        v.display_name ||
-        'Unnamed Voice',
-
-      language:
-        v.language || '',
-
-      tags:
-        Array.isArray(v.tags)
-          ? v.tags
-          : []
-    }));
-
-    res.json({
-      voices
-    });
-
-  } catch (error) {
-    res.status(
-      error.response?.status || 500
-    ).json({
-      error:
-        'فشل تحميل الأصوات الخاصة بك',
-      details:
-        error.response?.data ||
-        error.message
-    });
-  }
-});
-
-
-const previewAudioCache = new Map();
-
-app.post('/api/voice-preview', async (req, res) => {
-  try {
-    const { voiceId } = req.body || {};
-
-    if (!voiceId) {
-      return res.status(400).json({
-        success: false,
-        error: 'voiceId is required'
-      });
-    }
-
-    const modelResponse = await axios.get(
-      `${FISH_BASE}/model/${encodeURIComponent(voiceId)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${FISH_API_KEY}`
-        },
-        timeout: 15000
-      }
-    );
-
-    const voice = modelResponse.data || {};
-    const previewText = getVoicePreviewText(voice);
-
-    console.log(
-      `🎧 Preview voice=${voiceId} lang=${
-        Array.isArray(voice.languages)
-          ? voice.languages.join(',')
-          : (voice.language || 'unknown')
-      } text="${previewText.slice(0, 80)}..."`
-    );
-
-    const audio = await fishTTS(
-      previewText,
-      voiceId,
-      'preview'
-    );
-
-    const safeVoiceId = String(voiceId).replace(/[^a-zA-Z0-9_-]/g, '');
-    const fileName = `preview-${safeVoiceId}.mp3`;
-    const filePath = path.join(AUDIO_DIR, fileName);
-
-    fs.writeFileSync(filePath, audio);
-
-    console.log(`✅ Preview saved: ${filePath}`);
-
-    return res.json({
-      success: true,
-      audioUrl: `/api/audio/${encodeURIComponent(fileName.replace(/\\.mp3$/i, ''))}`
-    });
-
-  } catch (error) {
-    console.error(
-      '❌ Voice preview error:',
-      error.response?.data || error.message
-    );
-
-    return res.status(500).json({
-      success: false,
-      error: 'Voice preview failed'
-    });
-  }
-});
-
-app.post('/api/tts', async (req, res) => {
-  try {
-    const {
-      text,
-      voiceId,
-      emotion = 'neutral'
-    } = req.body || {};
-
-    if (!text || !String(text).trim()) {
-      return res.status(400).json({ error: 'النص فارغ' });
-    }
-
-    if (!voiceId) {
-      return res.status(400).json({ error: 'خاصك تختار الصوت' });
-    }
-
-    const originalText = String(text).trim();
-
-    if (originalText.length > 50000) {
-      return res.status(400).json({
-        error: 'الحد الأقصى هو 50,000 حرف'
-      });
-    }
-
-    const requestedJobId =
-      req.headers['x-tts-job-id'] ||
-      req.body.jobId;
-
-    if (requestedJobId && ttsJobs.has(requestedJobId)) {
-      const existing = ttsJobs.get(requestedJobId);
-
-      if (!existing.finished && !existing.failed) {
-        return res.status(202).json({
-          success: true,
-          jobId: requestedJobId,
-          resumed: true
-        });
-      }
-
-      if (existing.finished) {
-        return res.json({
-          success: true,
-          jobId: requestedJobId,
-          resumed: true,
-          audioUrl: existing.audioUrl,
-          processingSeconds: existing.processingSeconds
-        });
-      }
-    }
-
-    const chunks = splitText(originalText, CHUNK_SIZE);
-    const prepared = chunks.map(chunk =>
-      applyEmotion(chunk, emotion)
-    );
-
-    const jobId =
-      requestedJobId ||
-      Math.random().toString(36).slice(2) +
-      Date.now().toString(36);
-
-    const job = {
-      id: jobId,
-      total: prepared.length,
-      completed: 0,
-      running: 0,
-      startedAt: Date.now(),
-      partTimes: [],
-      merging: false,
-      finished: false,
-      failed: false,
-      audioUrl: null,
-      processingSeconds: null,
-      voiceId,
-      emotion,
-      characters: originalText.length,
-      chunks: prepared.map((_, i) => ({
-        part: i + 1,
-        status: 'queued',
-        startedAt: null,
-        finishedAt: null
-      }))
-    };
-
-    ttsJobs.set(jobId, job);
-
-    console.log(
-      `🎙️ TTS Job ${jobId}: ${originalText.length} chars → ${prepared.length} chunks → ${PARALLEL} parallel`
-    );
-
-    // Start in the background. The browser does NOT need to stay connected.
-    void processTTSJob(job, prepared, voiceId, originalText);
-
-    return res.status(202).json({
-      success: true,
-      jobId,
-      total: prepared.length,
-      parallel: PARALLEL,
-      chunkSize: CHUNK_SIZE
-    });
-
-  } catch (error) {
-    console.error(
-      'TTS start error:',
-      error.response?.data || error.message
-    );
-
-    return res.status(500).json({
-      error: 'فشل بدء إنشاء الصوت',
-      details: error.response?.data || error.message
-    });
-  }
-});
-
 async function processTTSJob(job, prepared, voiceId, originalText) {
   const startedAt = job.startedAt;
 
